@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Water Supply Scheme History"
+    Manufacturer="City Water Works"
+    Version="1.0.0"
+    UpgradeCode="D2E5E26A-8C95-454B-B33D-1D051C634A54"
+    Language="1033"
+    InstallerVersion="500"
+    Scope="perUser">
+    <MajorUpgrade DowngradeErrorMessage="A newer version is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="MainFeature" Title="Water Supply Scheme History" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+      <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="UninstallShortcut" />
+      <ComponentRef Id="CleanupInstallFolder" />
+    </Feature>
+  </Package>
+
+  <Fragment>
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Water Supply Scheme History" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder" />
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppStartMenuFolder" Name="Water Supply Scheme History" />
+    </StandardDirectory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.SourceDir)\**" />
+    </ComponentGroup>
+
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
+      <Shortcut Id="DesktopShortcutLink"
+                Name="Water Supply Scheme History"
+                Description="City Water Works - Water Supply Scheme History"
+                Target="[INSTALLFOLDER]city_water_works_app.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU" Key="Software\CityWaterWorks\WaterSupplySchemeHistory"
+                     Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="StartMenuShortcut" Directory="AppStartMenuFolder" Guid="B2C3D4E5-F6A7-8901-BCDE-F12345678901">
+      <Shortcut Id="StartMenuShortcutLink"
+                Name="Water Supply Scheme History"
+                Description="City Water Works - Water Supply Scheme History"
+                Target="[INSTALLFOLDER]city_water_works_app.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveAppStartMenuFolder" Directory="AppStartMenuFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\CityWaterWorks\WaterSupplySchemeHistory"
+                     Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="UninstallShortcut" Directory="AppStartMenuFolder" Guid="D4E5F6A7-B8C9-0123-DEF0-234567890123">
+      <Shortcut Id="UninstallShortcutLink"
+                Name="Uninstall Water Supply Scheme History"
+                Description="Uninstall Water Supply Scheme History"
+                Target="[SystemFolder]msiexec.exe"
+                Arguments="/x [ProductCode]" />
+      <RegistryValue Root="HKCU" Key="Software\CityWaterWorks\WaterSupplySchemeHistory"
+                     Name="UninstallShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="CleanupInstallFolder" Directory="INSTALLFOLDER" Guid="C3D4E5F6-A7B8-9012-CDEF-123456789012">
+      <RemoveFolder Id="RemoveINSTALLFOLDER" Directory="INSTALLFOLDER" On="uninstall" />
+      <RemoveFolder Id="RemoveProgramsFolder" Directory="ProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\CityWaterWorks\WaterSupplySchemeHistory"
+                     Name="CleanupInstallFolder" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+  </Fragment>
+</Wix>
