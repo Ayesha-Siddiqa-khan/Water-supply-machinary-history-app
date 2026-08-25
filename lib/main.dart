@@ -306,18 +306,21 @@ class _AppShellState extends State<AppShell> {
                         final selected = i == _selectedIndex;
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 4),
-                          child: ListTile(
-                            selected: selected,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            selectedTileColor: _surfaceSoft,
-                            iconColor: selected ? _accent : _textSecondary,
-                            textColor: selected ? _textPrimary : _textSecondary,
-                            leading: Icon(item.icon, size: 20),
-                            title: Text(item.label,
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500)),
-                            onTap: () => setState(() => _selectedIndex = i),
+                          child: Material(
+                            type: MaterialType.transparency,
+                            child: ListTile(
+                              selected: selected,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              selectedTileColor: _surfaceSoft,
+                              iconColor: selected ? _accent : _textSecondary,
+                              textColor: selected ? _textPrimary : _textSecondary,
+                              leading: Icon(item.icon, size: 20),
+                              title: Text(item.label,
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500)),
+                              onTap: () => setState(() => _selectedIndex = i),
+                            ),
                           ),
                         );
                       },

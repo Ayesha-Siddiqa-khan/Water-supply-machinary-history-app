@@ -13,6 +13,9 @@ import '../database/daos/machinery_dao.dart';
 import '../database/daos/billing_entries_dao.dart';
 import '../database/daos/miscellaneous_dao.dart';
 import '../models/machinery.dart';
+import '../models/set_model.dart';
+import '../models/scheme.dart';
+import '../models/billing_entry.dart';
 
 class ExportService {
   final SchemesDao _schemesDao = SchemesDao();
@@ -257,8 +260,8 @@ class ExportService {
 
   // ─────────────────── PDF Export ───────────────────
 
-  Future<Uint8List> exportSetToPdf(int setId) async {
-    return _exportSetToPdfInternal(setId);
+  Future<Uint8List> exportSetToPdf(int setId, {bool includeSpecs = false}) async {
+    return _exportSetToPdfInternal(setId, includeSpecs: includeSpecs);
   }
 
   Future<Uint8List> exportSingleMachineryToPdf(int setId, int machineryId) async {
@@ -270,7 +273,7 @@ class ExportService {
     return _exportSetToPdfInternal(setId, machineryOverride: [selected]);
   }
 
-  Future<Uint8List> _exportSetToPdfInternal(int setId, {List<Machinery>? machineryOverride}) async {
+  Future<Uint8List> _exportSetToPdfInternal(int setId, {List<Machinery>? machineryOverride, bool includeSpecs = false}) async {
     await _ensureFontsLoaded();
     final setModel = await _setsDao.getSetById(setId);
     if (setModel == null) throw Exception('Set not found');
@@ -351,7 +354,7 @@ class ExportService {
             final blockIndex = blockEntry.key;
             final block = blockEntry.value;
             final tableWidth = PdfPageFormat.a4.landscape.width - 36;
-            final perMachineryCols = isUselessScheme ? 6 : 3;
+            final perMachineryCols = isUselessScheme ? 6 : 4;
             final totalCols = 1 + (block.length * perMachineryCols);
             final colWidth = tableWidth / totalCols;
             final firstHeaderWidth = colWidth * (perMachineryCols + 1);
@@ -364,6 +367,31 @@ class ExportService {
                   child: pw.Text('Continued',
                       style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
                 ),
+              if (includeSpecs)
+                ...block.expand((machinery) {
+                  final specs = machinery.specs.entries.where((e) => e.value.trim().isNotEmpty).toList();
+                  if (specs.isEmpty) return <pw.Widget>[];
+                  return [
+                    pw.Container(
+                      width: double.infinity,
+                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      decoration: pw.BoxDecoration(color: PdfColor.fromHex('#E8EDF2')),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(_machineryHeaderLabel(machinery),
+                              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            specs.map((e) => '${e.key}: ${e.value}').join(' | '),
+                            style: const pw.TextStyle(fontSize: 7),
+                          ),
+                        ],
+                      ),
+                    ),
+                    pw.SizedBox(height: 2),
+                  ];
+                }),
               pw.Row(
                 children: [
                   ...block.asMap().entries.map((entry) {
@@ -392,6 +420,7 @@ class ExportService {
                         ]
                       : [
                           _pdfCell('Date', width: colWidth, bold: true, align: pw.TextAlign.center),
+                          _pdfCell('Work Order No.', width: colWidth, bold: true, align: pw.TextAlign.center),
                           _pdfCell('Voucher No.', width: colWidth, bold: true, align: pw.TextAlign.center),
                           _pdfCell('Amount', width: colWidth, bold: true, align: pw.TextAlign.center),
                         ]),
@@ -416,6 +445,7 @@ class ExportService {
                       }
                       return [
                         _pdfCell(entry?.entryDate ?? '-', width: colWidth, align: pw.TextAlign.center),
+                        _pdfCell(entry?.workOrderNo ?? '-', width: colWidth, align: pw.TextAlign.center),
                         _pdfCell(entry?.voucherNo?.toString() ?? '-', width: colWidth, align: pw.TextAlign.center),
                         _pdfCell(entry != null ? _formatAmount(entry.amount) : '-', width: colWidth, align: pw.TextAlign.center),
                       ];
@@ -499,6 +529,134 @@ class ExportService {
         ),
       ),
     );
+  }
+
+  /// Printable A4 report for the set detail page: equipment info and billing
+  /// entries, optionally including full specification tables.
+  Future<Uint8List> buildSetDetailReport({
+    required SetModel set,
+    Scheme? scheme,
+    required List<Machinery> machineryList,
+    required Map<int, List<BillingEntry>> entriesByMachineryId,
+    bool includeSpecs = false,
+  }) async {
+    await _ensureFontsLoaded();
+    final pdf = pw.Document(theme: _pdfTheme());
+
+    final schemeName = scheme?.schemeName ?? '';
+    final headerStyle = pw.TextStyle(
+      fontSize: 8,
+      fontWeight: pw.FontWeight.bold,
+      color: PdfColors.white,
+      fontFallback: _fontFallback ?? [],
+    );
+    final cellStyle = pw.TextStyle(fontSize: 8, fontFallback: _fontFallback ?? []);
+    final tableBorder = pw.TableBorder.all(color: PdfColors.grey600, width: 0.5);
+
+    pw.Widget sectionTable(List<String> headers, List<List<String>> rows) {
+      return pw.TableHelper.fromTextArray(
+        headers: headers,
+        data: rows,
+        headerStyle: headerStyle,
+        headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#1E3A5F')),
+        headerAlignment: pw.Alignment.topLeft,
+        cellStyle: cellStyle,
+        cellAlignment: pw.Alignment.topLeft,
+        cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        border: tableBorder,
+      );
+    }
+
+    final content = <pw.Widget>[
+      pw.Text('Water Supply Scheme History',
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+      pw.SizedBox(height: 2),
+      pw.Text('$schemeName - ${set.setLabel}',
+          textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 12)),
+      pw.SizedBox(height: 2),
+      pw.Text('Total: ${_formatAmount(set.totalAmount)} | Printed on ${_nowFormatted()}',
+          textAlign: pw.TextAlign.center,
+          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+      pw.SizedBox(height: 8),
+    ];
+
+    final setInfo = set.details.entries.where((e) => e.value.trim().isNotEmpty).toList();
+    if (setInfo.isNotEmpty) {
+      content.add(sectionTable(
+        const ['Set Information', 'Details'],
+        [for (final e in setInfo) [e.key, e.value]],
+      ));
+      content.add(pw.SizedBox(height: 10));
+    }
+
+    for (final machinery in machineryList) {
+      final entries = entriesByMachineryId[machinery.machineryId] ?? const [];
+      final total = entries.fold<double>(0, (s, e) => s + e.amount);
+
+      content.add(pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        decoration: pw.BoxDecoration(color: PdfColor.fromHex('#1E3A5F')),
+        child: pw.Text(
+          '${machinery.displayLabel} (${machinery.machineryType}) | ${entries.length} entries | Total: ${_formatAmount(total)}',
+          style: pw.TextStyle(
+              color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10),
+        ),
+      ));
+      content.add(pw.SizedBox(height: 4));
+
+      if (includeSpecs) {
+        final specs = machinery.specs.entries.where((e) => e.value.trim().isNotEmpty).toList();
+        if (specs.isNotEmpty) {
+          content.add(sectionTable(
+            [for (final e in specs) e.key],
+            [[for (final e in specs) e.value]],
+          ));
+          content.add(pw.SizedBox(height: 6));
+        }
+      }
+
+      if (entries.isEmpty) {
+        content.add(pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(vertical: 4),
+          child: pw.Text('No billing entries yet.',
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
+        ));
+      } else {
+        content.add(sectionTable(
+          const ['Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount (PKR)', 'Reg. Page No.'],
+          [
+            for (final e in entries)
+              [
+                '${e.serialNo}',
+                e.entryDate,
+                e.workOrderNo ?? '-',
+                e.voucherNo?.toString() ?? '-',
+                _formatAmount(e.amount),
+                e.regPageNo ?? '-',
+              ],
+            [
+              'Total',
+              '',
+              '',
+              '',
+              _formatAmount(total),
+              '',
+            ],
+          ],
+        ));
+      }
+      content.add(pw.SizedBox(height: 12));
+    }
+
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(18),
+      build: (context) => content,
+    ));
+
+    return pdf.save();
   }
 
   static bool _containsArabic(String text) {
@@ -867,6 +1025,7 @@ class ExportService {
                     ]
                   : [
                       _pdfCell('Date', width: colWidth, bold: true, align: pw.TextAlign.center),
+                      _pdfCell('Work Order No.', width: colWidth, bold: true, align: pw.TextAlign.center),
                       _pdfCell('Voucher No.', width: colWidth, bold: true, align: pw.TextAlign.center),
                       _pdfCell('Amount', width: colWidth, bold: true, align: pw.TextAlign.center),
                     ]),
@@ -894,6 +1053,7 @@ class ExportService {
                   }
                   return [
                     _pdfCell(entry?.entryDate ?? '-', width: colWidth, align: pw.TextAlign.center),
+                    _pdfCell(entry?.workOrderNo ?? '-', width: colWidth, align: pw.TextAlign.center),
                     _pdfCell(entry?.voucherNo?.toString() ?? '-', width: colWidth, align: pw.TextAlign.center),
                     _pdfCell(
                         entry != null ? _formatAmount(entry.amount) : '-',
@@ -1268,6 +1428,7 @@ class ExportService {
                     _pdfCell('Sr.No', width: colWidth, bold: true, align: pw.TextAlign.center),
                     ...block.expand((_) => [
                           _pdfCell('Date', width: colWidth, bold: true, align: pw.TextAlign.center),
+                          _pdfCell('Work Order No.', width: colWidth, bold: true, align: pw.TextAlign.center),
                           _pdfCell('Voucher No.', width: colWidth, bold: true, align: pw.TextAlign.center),
                           _pdfCell('Amount', width: colWidth, bold: true, align: pw.TextAlign.center),
                         ]),
@@ -1285,6 +1446,7 @@ class ExportService {
                         final entry = rowIndex < mEntries.length ? mEntries[rowIndex] : null;
                         return [
                           _pdfCell(entry?.entryDate ?? '-', width: colWidth, align: pw.TextAlign.center),
+                          _pdfCell(entry?.workOrderNo ?? '-', width: colWidth, align: pw.TextAlign.center),
                           _pdfCell(entry?.voucherNo?.toString() ?? '-', width: colWidth, align: pw.TextAlign.center),
                           _pdfCell(entry != null ? _formatAmount(entry.amount) : '-', width: colWidth, align: pw.TextAlign.center),
                         ];
@@ -1398,7 +1560,7 @@ class ExportService {
                 'Transferred To Scheme',
                 'Remarks',
               ]
-            : ['Sr.No', 'Date', 'Voucher No.', 'Amount', 'Reg. Page No.'];
+            : ['Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount', 'Reg. Page No.'];
         for (int h = 0; h < headers.length; h++) {
           final cell = sheet.cell(xl.CellIndex.indexByColumnRow(
               columnIndex: machColOffset + h, rowIndex: 2));
@@ -1437,10 +1599,12 @@ class ExportService {
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 1, rowIndex: 3 + i)).value =
             xl.TextCellValue(e.entryDate);
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 2, rowIndex: 3 + i)).value =
-            e.voucherNo != null ? xl.IntCellValue(e.voucherNo!) : xl.TextCellValue('');
+            xl.TextCellValue(e.workOrderNo ?? '');
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 3, rowIndex: 3 + i)).value =
-            xl.DoubleCellValue(e.amount);
+            e.voucherNo != null ? xl.IntCellValue(e.voucherNo!) : xl.TextCellValue('');
           sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 4, rowIndex: 3 + i)).value =
+            xl.DoubleCellValue(e.amount);
+          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 5, rowIndex: 3 + i)).value =
             xl.TextCellValue(e.regPageNo ?? '');
           }
         }
@@ -1493,7 +1657,7 @@ class ExportService {
               'Transferred To Scheme',
               'Remarks',
             ]
-          : ['Sr.No', 'Date', 'Voucher No.', 'Amount', 'Reg. Page No.'];
+          : ['Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount', 'Reg. Page No.'];
       for (int h = 0; h < headers.length; h++) {
         final cell =
             sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + h, rowIndex: 2));
@@ -1542,12 +1706,15 @@ class ExportService {
             .value = xl.TextCellValue(e.entryDate);
           sheet
             .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 2, rowIndex: 3 + i))
-            .value = e.voucherNo != null ? xl.IntCellValue(e.voucherNo!) : xl.TextCellValue('');
+            .value = xl.TextCellValue(e.workOrderNo ?? '');
           sheet
             .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 3, rowIndex: 3 + i))
-            .value = xl.DoubleCellValue(e.amount);
+            .value = e.voucherNo != null ? xl.IntCellValue(e.voucherNo!) : xl.TextCellValue('');
           sheet
             .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 4, rowIndex: 3 + i))
+            .value = xl.DoubleCellValue(e.amount);
+          sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 5, rowIndex: 3 + i))
             .value = xl.TextCellValue(e.regPageNo ?? '');
         }
       }
@@ -1598,7 +1765,7 @@ class ExportService {
             'Transferred To Scheme',
             'Remarks',
           ]
-        : ['Sr.No', 'Date', 'Voucher No.', 'Amount', 'Reg. Page No.'];
+        : ['Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount', 'Reg. Page No.'];
     for (int h = 0; h < headers.length; h++) {
       final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: h, rowIndex: 2));
       cell.value = xl.TextCellValue(headers[h]);
@@ -1635,10 +1802,12 @@ class ExportService {
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 3 + i)).value =
         xl.TextCellValue(e.entryDate);
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 3 + i)).value =
-        e.voucherNo != null ? xl.IntCellValue(e.voucherNo!) : xl.TextCellValue('');
+        xl.TextCellValue(e.workOrderNo ?? '');
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 3 + i)).value =
-        xl.DoubleCellValue(e.amount);
+        e.voucherNo != null ? xl.IntCellValue(e.voucherNo!) : xl.TextCellValue('');
       sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 3 + i)).value =
+        xl.DoubleCellValue(e.amount);
+      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 3 + i)).value =
         xl.TextCellValue(e.regPageNo ?? '');
       }
     }
@@ -1671,7 +1840,7 @@ class ExportService {
         'Scheme,Set,Machinery Type,Specs,Sr.No,Date,Reg. Page No.,Disabled/Closed,Submitted To Store Date,Transfer Date,Transferred To Scheme,Remarks',
       );
     } else {
-      buffer.writeln('Scheme,Set,Machinery Type,Specs,Sr.No,Date,Voucher No.,Amount,Reg. Page No.,Notes');
+      buffer.writeln('Scheme,Set,Machinery Type,Specs,Sr.No,Date,Work Order No.,Voucher No.,Amount,Reg. Page No.,Notes');
     }
 
     for (final setModel in sets) {
@@ -1687,7 +1856,7 @@ class ExportService {
             );
           } else {
             buffer.writeln(
-              '"${scheme.schemeName}","${setModel.setLabel}","${machinery.machineryType}","${machinery.displayLabel}",${e.serialNo},"${e.entryDate}",${e.voucherNo ?? ''},${e.amount},"${e.regPageNo ?? ''}","${e.notes ?? ''}"',
+              '"${scheme.schemeName}","${setModel.setLabel}","${machinery.machineryType}","${machinery.displayLabel}",${e.serialNo},"${e.entryDate}","${e.workOrderNo ?? ''}",${e.voucherNo ?? ''},${e.amount},"${e.regPageNo ?? ''}","${e.notes ?? ''}"',
             );
           }
         }
@@ -1715,7 +1884,7 @@ class ExportService {
         'Scheme,Set,Machinery Type,Specs,Sr.No,Date,Reg. Page No.,Disabled/Closed,Submitted To Store Date,Transfer Date,Transferred To Scheme,Remarks',
       );
     } else {
-      buffer.writeln('Scheme,Set,Machinery Type,Specs,Sr.No,Date,Voucher No.,Amount,Reg. Page No.,Notes');
+      buffer.writeln('Scheme,Set,Machinery Type,Specs,Sr.No,Date,Work Order No.,Voucher No.,Amount,Reg. Page No.,Notes');
     }
 
     for (final machinery in machineryList) {
@@ -1727,7 +1896,7 @@ class ExportService {
           );
         } else {
           buffer.writeln(
-            '"${scheme?.schemeName ?? ''}","${setModel.setLabel}","${machinery.machineryType}","${machinery.displayLabel}",${e.serialNo},"${e.entryDate}",${e.voucherNo ?? ''},${e.amount},"${e.regPageNo ?? ''}","${e.notes ?? ''}"',
+            '"${scheme?.schemeName ?? ''}","${setModel.setLabel}","${machinery.machineryType}","${machinery.displayLabel}",${e.serialNo},"${e.entryDate}","${e.workOrderNo ?? ''}",${e.voucherNo ?? ''},${e.amount},"${e.regPageNo ?? ''}","${e.notes ?? ''}"',
           );
         }
       }
@@ -1758,7 +1927,7 @@ class ExportService {
         'Scheme,Set,Machinery Type,Specs,Sr.No,Date,Reg. Page No.,Disabled/Closed,Submitted To Store Date,Transfer Date,Transferred To Scheme,Remarks',
       );
     } else {
-      buffer.writeln('Scheme,Set,Machinery Type,Specs,Sr.No,Date,Voucher No.,Amount,Reg. Page No.,Notes');
+      buffer.writeln('Scheme,Set,Machinery Type,Specs,Sr.No,Date,Work Order No.,Voucher No.,Amount,Reg. Page No.,Notes');
     }
 
     final entries = await _entriesDao.getEntriesForMachinery(machinery.machineryId!);
@@ -1769,7 +1938,7 @@ class ExportService {
         );
       } else {
         buffer.writeln(
-          '"${scheme?.schemeName ?? ''}","${setModel.setLabel}","${machinery.machineryType}","${machinery.displayLabel}",${e.serialNo},"${e.entryDate}",${e.voucherNo ?? ''},${e.amount},"${e.regPageNo ?? ''}","${e.notes ?? ''}"',
+          '"${scheme?.schemeName ?? ''}","${setModel.setLabel}","${machinery.machineryType}","${machinery.displayLabel}",${e.serialNo},"${e.entryDate}","${e.workOrderNo ?? ''}",${e.voucherNo ?? ''},${e.amount},"${e.regPageNo ?? ''}","${e.notes ?? ''}"',
         );
       }
     }
@@ -1829,7 +1998,7 @@ class ExportService {
           ...records.map((record) {
             final rows = record.entries.isEmpty
                 ? [
-                    ['-', '-', '-', '-', '-']
+                    ['-', '-', '-', '-', '-', '-']
                   ]
                 : record.entries
                     .asMap()
@@ -1837,6 +2006,7 @@ class ExportService {
                     .map((entry) => [
                           '${entry.key + 1}',
                           entry.value.entryDate,
+                          entry.value.workOrderNo ?? '-',
                           entry.value.voucherNo ?? '-',
                           _formatAmount(entry.value.amount),
                           entry.value.regPageNo ?? '-',
@@ -1862,7 +2032,7 @@ class ExportService {
                   cellStyle: pw.TextStyle(fontSize: 8, fontFallback: _fontFallback ?? []),
                   cellAlignment: pw.Alignment.center,
                   headerAlignment: pw.Alignment.center,
-                  headers: const ['Sr.No', 'Date', 'Voucher No.', 'Amount (PKR)', 'Reg. Page No.'],
+                  headers: const ['Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount (PKR)', 'Reg. Page No.'],
                   data: rows,
                 ),
                 pw.SizedBox(height: 10),
@@ -1884,7 +2054,7 @@ class ExportService {
 
     final excel = xl.Excel.createExcel();
     final sheet = excel['Miscellaneous'];
-    final headers = ['Title', 'Category', 'Sr.No', 'Date', 'Voucher No.', 'Amount (PKR)', 'Reg. Page No.'];
+    final headers = ['Title', 'Category', 'Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount (PKR)', 'Reg. Page No.'];
 
     for (int i = 0; i < headers.length; i++) {
       final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
@@ -1913,9 +2083,10 @@ class ExportService {
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(record.category);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.IntCellValue(i + 1);
         sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue(e.entryDate);
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(e.voucherNo ?? '');
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.DoubleCellValue(e.amount);
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.TextCellValue(e.regPageNo ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(e.workOrderNo ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.TextCellValue(e.voucherNo ?? '');
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.DoubleCellValue(e.amount);
+        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.TextCellValue(e.regPageNo ?? '');
         row++;
       }
     }
@@ -1939,7 +2110,7 @@ class ExportService {
 
     final buffer = StringBuffer();
     buffer.write('\uFEFF');
-    buffer.writeln('Title,Category,Sr.No,Date,Voucher No.,Amount (PKR),Reg. Page No.');
+    buffer.writeln('Title,Category,Sr.No,Date,Work Order No.,Voucher No.,Amount (PKR),Reg. Page No.');
 
     for (final record in records) {
       if (record.entries.isEmpty) {
@@ -1950,7 +2121,7 @@ class ExportService {
       for (int i = 0; i < record.entries.length; i++) {
         final e = record.entries[i];
         buffer.writeln(
-          '"${record.title}","${record.category}",${i + 1},"${e.entryDate}","${e.voucherNo ?? ''}",${e.amount},"${e.regPageNo ?? ''}"',
+          '"${record.title}","${record.category}",${i + 1},"${e.entryDate}","${e.workOrderNo ?? ''}","${e.voucherNo ?? ''}",${e.amount},"${e.regPageNo ?? ''}"',
         );
       }
     }
@@ -2005,12 +2176,14 @@ class _MiscRecordExport {
 
 class _MiscEntryExport {
   final String entryDate;
+  final String? workOrderNo;
   final String? voucherNo;
   final double amount;
   final String? regPageNo;
 
   _MiscEntryExport({
     required this.entryDate,
+    this.workOrderNo,
     this.voucherNo,
     required this.amount,
     this.regPageNo,
@@ -2019,6 +2192,7 @@ class _MiscEntryExport {
   factory _MiscEntryExport.fromJson(Map<String, dynamic> json) {
     return _MiscEntryExport(
       entryDate: (json['entryDate'] ?? '').toString(),
+      workOrderNo: json['workOrderNo']?.toString(),
       voucherNo: json['voucherNo']?.toString(),
       amount: double.tryParse((json['amount'] ?? 0).toString()) ?? 0,
       regPageNo: json['regPageNo']?.toString(),

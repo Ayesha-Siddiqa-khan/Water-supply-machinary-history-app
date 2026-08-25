@@ -63,6 +63,7 @@ class ParsedMachinery {
 class ParsedEntry {
   int serialNo;
   String date;
+  String? workOrderNo;
   int? voucherNo;
   double amount;
   String? regPageNo;
@@ -72,6 +73,7 @@ class ParsedEntry {
   ParsedEntry({
     required this.serialNo,
     required this.date,
+    this.workOrderNo,
     this.voucherNo,
     required this.amount,
     this.regPageNo,
@@ -423,6 +425,8 @@ class ImportService {
   List<ParsedEntry> _parseEntries(List<List<Data?>> rows, int startRow, int startCol, int endCol) {
     final List<ParsedEntry> entries = [];
     int emptyRowCount = 0;
+    // Header row sits directly above the first data row.
+    final woShift = _isWorkOrderHeader(rows, startRow - 1, startCol + 2) ? 1 : 0;
 
     for (int r = startRow; r < rows.length; r++) {
       final row = rows[r];
@@ -432,11 +436,12 @@ class ImportService {
         continue;
       }
 
-      // Try to read Sr.No, Date, Voucher No., Amount
+      // Try to read Sr.No, Date, [Work Order No.,] Voucher No., Amount
       final snCell = startCol < row.length ? row[startCol] : null;
       final dateCell = startCol + 1 < row.length ? row[startCol + 1] : null;
-      final voucherCell = startCol + 2 < row.length ? row[startCol + 2] : null;
-      final amountCell = startCol + 3 < row.length ? row[startCol + 3] : null;
+      final workOrderCell = woShift == 1 && startCol + 2 < row.length ? row[startCol + 2] : null;
+      final voucherCell = startCol + 2 + woShift < row.length ? row[startCol + 2 + woShift] : null;
+      final amountCell = startCol + 3 + woShift < row.length ? row[startCol + 3 + woShift] : null;
 
       if (snCell == null || snCell.value == null) {
         emptyRowCount++;
@@ -450,6 +455,7 @@ class ImportService {
       if (sn == null) continue;
 
       final date = _parseDate(dateCell?.value);
+      final workOrderText = workOrderCell?.value?.toString().trim();
       final voucher = _parseInt(voucherCell?.value);
       final amount = _parseDouble(amountCell?.value);
 
@@ -460,6 +466,7 @@ class ImportService {
       entries.add(ParsedEntry(
         serialNo: sn,
         date: date ?? '',
+        workOrderNo: (workOrderText == null || workOrderText.isEmpty) ? null : workOrderText,
         voucherNo: voucher,
         amount: amount ?? 0.0,
         regPageNo: null,
@@ -483,6 +490,17 @@ class ImportService {
     return null;
   }
 
+  /// True when the column right after [col] is headed "Work Order No." —
+  /// newer exports insert it between Date and Voucher No.; older files don't
+  /// have it, so column offsets shift by one only when present.
+  bool _isWorkOrderHeader(List<List<Data?>> rows, int headerRowIdx, int col) {
+    if (headerRowIdx < 0 || headerRowIdx >= rows.length) return false;
+    final headerRow = rows[headerRowIdx];
+    if (col < 0 || col >= headerRow.length) return false;
+    final text = headerRow[col]?.value?.toString().trim().toLowerCase() ?? '';
+    return text.contains('work order');
+  }
+
   List<List<ParsedEntry>> _parseGroupedEntries(
     List<List<Data?>> rows,
     int startRow,
@@ -500,11 +518,18 @@ class ImportService {
       for (int i = 0; i < machineryList.length; i++) {
         final mach = machineryList[i];
         final dataStartCol = mach.startCol == serialCol ? mach.startCol + 1 : mach.startCol;
+        // Work Order No. (when present) sits between Date and Voucher No.
+        final woShift = _isWorkOrderHeader(rows, startRow - 1, dataStartCol + 1) ? 1 : 0;
         final dateVal = dataStartCol < row.length ? row[dataStartCol]?.value : null;
-        final voucherVal = dataStartCol + 1 < row.length ? row[dataStartCol + 1]?.value : null;
-        final amountVal = dataStartCol + 2 < row.length ? row[dataStartCol + 2]?.value : null;
+        final workOrderVal =
+            woShift == 1 && dataStartCol + 1 < row.length ? row[dataStartCol + 1]?.value : null;
+        final voucherVal =
+            dataStartCol + 1 + woShift < row.length ? row[dataStartCol + 1 + woShift]?.value : null;
+        final amountVal =
+            dataStartCol + 2 + woShift < row.length ? row[dataStartCol + 2 + woShift]?.value : null;
 
         final date = _parseDate(dateVal);
+        final workOrderText = workOrderVal?.toString().trim();
         final voucher = _parseInt(voucherVal);
         final amount = _parseDouble(amountVal);
 
@@ -520,6 +545,7 @@ class ImportService {
         grouped[i].add(ParsedEntry(
           serialNo: inferredSerial,
           date: date ?? '',
+          workOrderNo: (workOrderText == null || workOrderText.isEmpty) ? null : workOrderText,
           voucherNo: voucher,
           amount: amount ?? 0.0,
           regPageNo: null,
@@ -835,6 +861,7 @@ class ImportService {
                 machineryId: machineryId,
                 serialNo: pe.serialNo,
                 entryDate: pe.date,
+                workOrderNo: pe.workOrderNo,
                 voucherNo: pe.voucherNo,
                 amount: pe.amount,
                 regPageNo: pe.regPageNo,

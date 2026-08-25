@@ -45,6 +45,7 @@ class _ExportScreenState extends State<ExportScreen> {
   String _exportFormat = 'pdf';
   String _exportScope = 'set';
   String _schemeCategory = 'scheme';
+  bool _includeSpecs = false;
 
   bool _isLoading = true;
   bool _isExporting = false;
@@ -215,7 +216,7 @@ class _ExportScreenState extends State<ExportScreen> {
           );
           filename = _buildSuggestedFileName(extension: 'pdf');
         } else if (_exportScope == 'set' && _selectedSet != null) {
-          pdfBytes = await _exportService.exportSetToPdf(_selectedSet!.setId!);
+          pdfBytes = await _exportService.exportSetToPdf(_selectedSet!.setId!, includeSpecs: _includeSpecs);
           filename = _buildSuggestedFileName(extension: 'pdf');
         } else {
           pdfBytes = await _exportService.exportSchemeToPdf(_selectedScheme!.schemeId!);
@@ -764,6 +765,14 @@ class _ExportScreenState extends State<ExportScreen> {
                 _buildFormatTile('pdf', l10n.exportFormatPdf, Icons.picture_as_pdf, Colors.red),
                 _buildFormatTile('excel', l10n.exportFormatExcel, Icons.table_chart, Colors.green),
                 _buildFormatTile('csv', l10n.exportFormatCsv, Icons.text_snippet, Colors.blue),
+                const SizedBox(height: 16),
+                if (_exportFormat == 'pdf' && _exportScope == 'set')
+                  SwitchListTile(
+                    title: const Text('Include Specifications'),
+                    subtitle: const Text('Add equipment specs before the table'),
+                    value: _includeSpecs,
+                    onChanged: (v) => setState(() => _includeSpecs = v),
+                  ),
                 const SizedBox(height: 24),
 
                 // Export button

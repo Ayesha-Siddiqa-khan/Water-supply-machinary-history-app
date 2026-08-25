@@ -26,7 +26,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 8,
+        version: 10,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: (db) async {
@@ -53,6 +53,7 @@ class AppDatabase {
         scheme_id INTEGER NOT NULL,
         set_number INTEGER NOT NULL,
         set_label TEXT NOT NULL,
+        details TEXT,
         FOREIGN KEY (scheme_id) REFERENCES schemes (scheme_id) ON DELETE CASCADE
       )
     ''');
@@ -76,6 +77,7 @@ class AppDatabase {
         machinery_id INTEGER NOT NULL,
         serial_no INTEGER NOT NULL,
         entry_date TEXT NOT NULL,
+        work_order_no TEXT,
         voucher_no INTEGER,
         amount REAL NOT NULL,
         reg_page_no TEXT,
@@ -263,6 +265,14 @@ class AppDatabase {
 
     if (oldVersion < 8) {
       await db.execute("ALTER TABLE billing_entries ADD COLUMN transfer_date TEXT");
+    }
+
+    if (oldVersion < 9) {
+      await db.execute("ALTER TABLE sets ADD COLUMN details TEXT");
+    }
+
+    if (oldVersion < 10) {
+      await db.execute("ALTER TABLE billing_entries ADD COLUMN work_order_no TEXT");
     }
   }
 

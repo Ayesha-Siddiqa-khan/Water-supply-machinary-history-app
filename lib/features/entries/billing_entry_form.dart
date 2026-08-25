@@ -21,6 +21,7 @@ class _BillingEntryFormState extends State<BillingEntryForm> {
 
   late TextEditingController _serialNoCtrl;
   late TextEditingController _dateCtrl;
+  late TextEditingController _workOrderCtrl;
   late TextEditingController _voucherCtrl;
   late TextEditingController _amountCtrl;
   late TextEditingController _regPageCtrl;
@@ -34,6 +35,7 @@ class _BillingEntryFormState extends State<BillingEntryForm> {
     super.initState();
     _serialNoCtrl = TextEditingController();
     _dateCtrl = TextEditingController();
+    _workOrderCtrl = TextEditingController();
     _voucherCtrl = TextEditingController();
     _amountCtrl = TextEditingController();
     _regPageCtrl = TextEditingController();
@@ -43,6 +45,7 @@ class _BillingEntryFormState extends State<BillingEntryForm> {
       final e = widget.entry!;
       _serialNoCtrl.text = e.serialNo.toString();
       _dateCtrl.text = e.entryDate;
+      _workOrderCtrl.text = e.workOrderNo ?? '';
       _voucherCtrl.text = e.voucherNo?.toString() ?? '';
       _amountCtrl.text = e.amount.toStringAsFixed(0);
       _regPageCtrl.text = e.regPageNo ?? '';
@@ -72,6 +75,7 @@ class _BillingEntryFormState extends State<BillingEntryForm> {
   void dispose() {
     _serialNoCtrl.dispose();
     _dateCtrl.dispose();
+    _workOrderCtrl.dispose();
     _voucherCtrl.dispose();
     _amountCtrl.dispose();
     _regPageCtrl.dispose();
@@ -92,6 +96,7 @@ class _BillingEntryFormState extends State<BillingEntryForm> {
         await _dao.updateEntry(widget.entry!.copyWith(
           serialNo: serialNo,
           entryDate: _dateCtrl.text.trim(),
+          workOrderNo: _workOrderCtrl.text.trim().isEmpty ? null : _workOrderCtrl.text.trim(),
           voucherNo: voucherNo,
           amount: amount,
           regPageNo: _regPageCtrl.text.trim().isEmpty ? null : _regPageCtrl.text.trim(),
@@ -134,6 +139,7 @@ class _BillingEntryFormState extends State<BillingEntryForm> {
           machineryId: widget.machineryId,
           serialNo: serialNo,
           entryDate: _dateCtrl.text.trim(),
+          workOrderNo: _workOrderCtrl.text.trim().isEmpty ? null : _workOrderCtrl.text.trim(),
           voucherNo: voucherNo,
           amount: amount,
           regPageNo: _regPageCtrl.text.trim().isEmpty ? null : _regPageCtrl.text.trim(),
@@ -213,6 +219,12 @@ class _BillingEntryFormState extends State<BillingEntryForm> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+
+              AppTextField(
+                controller: _workOrderCtrl,
+                label: 'Work Order No.',
               ),
               const SizedBox(height: 12),
 

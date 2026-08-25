@@ -48,6 +48,10 @@ class RecentEntriesList extends StatelessWidget {
                 Row(
                   children: [
                     Text(entry.entryDate, style: Theme.of(context).textTheme.bodySmall),
+                    if (entry.workOrderNo != null && entry.workOrderNo!.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Text('WO ${entry.workOrderNo}', style: Theme.of(context).textTheme.bodySmall),
+                    ],
                     if (entry.voucherNo != null) ...[
                       const SizedBox(width: 8),
                       Text('V# ${entry.voucherNo}', style: Theme.of(context).textTheme.bodySmall),

@@ -3,6 +3,7 @@ class BillingEntry {
   final int machineryId;
   final int serialNo;
   final String entryDate; // DD-MM-YYYY
+  final String? workOrderNo;
   final int? voucherNo;
   final double amount;
   final String? regPageNo;
@@ -25,6 +26,7 @@ class BillingEntry {
     required this.machineryId,
     required this.serialNo,
     required this.entryDate,
+    this.workOrderNo,
     this.voucherNo,
     required this.amount,
     this.regPageNo,
@@ -47,6 +49,7 @@ class BillingEntry {
       'machinery_id': machineryId,
       'serial_no': serialNo,
       'entry_date': entryDate,
+      'work_order_no': workOrderNo,
       'voucher_no': voucherNo,
       'amount': amount,
       'reg_page_no': regPageNo,
@@ -67,6 +70,7 @@ class BillingEntry {
       machineryId: map['machinery_id'] as int,
       serialNo: map['serial_no'] as int,
       entryDate: map['entry_date'] as String,
+      workOrderNo: map['work_order_no'] as String?,
       voucherNo: map['voucher_no'] as int?,
       amount: (map['amount'] as num).toDouble(),
       regPageNo: map['reg_page_no'] as String?,
@@ -89,6 +93,7 @@ class BillingEntry {
     int? machineryId,
     int? serialNo,
     String? entryDate,
+    String? workOrderNo,
     int? voucherNo,
     double? amount,
     String? regPageNo,
@@ -106,6 +111,7 @@ class BillingEntry {
       machineryId: machineryId ?? this.machineryId,
       serialNo: serialNo ?? this.serialNo,
       entryDate: entryDate ?? this.entryDate,
+      workOrderNo: workOrderNo ?? this.workOrderNo,
       voucherNo: voucherNo ?? this.voucherNo,
       amount: amount ?? this.amount,
       regPageNo: regPageNo ?? this.regPageNo,
