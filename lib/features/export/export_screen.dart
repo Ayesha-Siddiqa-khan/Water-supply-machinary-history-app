@@ -206,6 +206,20 @@ class _ExportScreenState extends State<ExportScreen> {
     }
     setState(() => _isExporting = true);
 
+    String? effectiveHeader;
+    if (_exportFormat == 'pdf') {
+      final savedHeader = await ExportService.loadHeaderText();
+      final headerText = await ExportService.showHeaderEditDialog(
+        context,
+        currentHeader: savedHeader,
+      );
+      if (!mounted) {
+        setState(() => _isExporting = false);
+        return;
+      }
+      effectiveHeader = (headerText != null && headerText.isNotEmpty) ? headerText : savedHeader;
+    }
+
     try {
       String? filePath;
       String? suggestedFileName;
@@ -226,12 +240,14 @@ class _ExportScreenState extends State<ExportScreen> {
           pdfBytes = await _exportService.exportSingleMachineryToPdf(
             _selectedSet!.setId!,
             _selectedMachinery!.machineryId!,
+            headerText: effectiveHeader,
           );
           filename = _buildSuggestedFileName(extension: 'pdf');
         } else if (isUselessCategoryExport &&
             _uselessExportMode == 'complete') {
           pdfBytes = await _exportService.exportSchemeToPdf(
             _selectedScheme!.schemeId!,
+            headerText: effectiveHeader,
           );
           filename = _buildSuggestedFileName(extension: 'pdf');
         } else if (_exportScope == 'set' &&
@@ -240,21 +256,27 @@ class _ExportScreenState extends State<ExportScreen> {
           pdfBytes = await _exportService.exportSingleMachineryToPdf(
             _selectedSet!.setId!,
             _selectedMachinery!.machineryId!,
+            headerText: effectiveHeader,
           );
           filename = _buildSuggestedFileName(extension: 'pdf');
         } else if (_exportScope == 'set' && _selectedSet != null) {
           pdfBytes = await _exportService.exportSetToPdf(
             _selectedSet!.setId!,
             includeSpecs: _includeSpecs,
+            headerText: effectiveHeader,
           );
           filename = _buildSuggestedFileName(extension: 'pdf');
         } else {
           pdfBytes = await _exportService.exportSchemeToPdf(
             _selectedScheme!.schemeId!,
+            headerText: effectiveHeader,
           );
           filename = _buildSuggestedFileName(extension: 'pdf');
         }
         suggestedFileName = filename;
+        if (effectiveHeader != null && effectiveHeader.isNotEmpty) {
+          await ExportService.saveHeaderText(effectiveHeader);
+        }
         filePath = await _savePdfWithPathChoice(pdfBytes, filename);
       } else if (_exportFormat == 'excel') {
         suggestedFileName = _buildSuggestedFileName(extension: 'xlsx');

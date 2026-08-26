@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import '../../core/database/daos/settings_dao.dart';
 import '../../core/database/daos/miscellaneous_dao.dart';
 import '../../core/database/daos/schemes_dao.dart';
 import '../../core/database/daos/sets_dao.dart';
 import '../../core/models/scheme.dart';
 import '../../core/models/set_model.dart';
+import '../../core/services/export_service.dart';
+import '../../shared/theme/app_colors.dart';
 
 class MiscellaneousScreen extends StatefulWidget {
   final int? initialSchemeId;
@@ -139,6 +143,115 @@ class _MiscellaneousScreenState extends State<MiscellaneousScreen> {
 
   Future<void> _addRecord() async {
     await _showRecordDialog();
+  }
+
+  Future<void> _showExportOptions() async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf),
+              title: const Text('Export as PDF'),
+              subtitle: const Text('Professional A4 report for all records'),
+              onTap: () => Navigator.pop(ctx, 'pdf'),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined),
+              title: const Text('Export as Excel'),
+              subtitle: const Text('Spreadsheet format for all records'),
+              onTap: () => Navigator.pop(ctx, 'excel'),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.code),
+              title: const Text('Export as CSV'),
+              subtitle: const Text('Plain text comma-separated values'),
+              onTap: () => Navigator.pop(ctx, 'csv'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      if (result == 'pdf') {
+        final savedHeader = await ExportService.loadHeaderText();
+        final headerText = await ExportService.showHeaderEditDialog(
+          context,
+          currentHeader: savedHeader,
+        );
+        if (!mounted) return;
+        final effectiveHeader = (headerText != null && headerText.isNotEmpty)
+            ? headerText
+            : savedHeader;
+
+        final bytes = await ExportService().exportMiscellaneousToPdf(
+          schemeId: widget.initialSchemeId,
+          setId: widget.initialSetId,
+        );
+        if (!mounted) return;
+
+        if (headerText != null && headerText.isNotEmpty) {
+          await ExportService.saveHeaderText(headerText);
+        }
+
+        final baseName = (widget.initialSchemeName ?? 'Miscellaneous')
+            .replaceAll(RegExp(r'[^\w\s]'), '_');
+        final pdfName = '${baseName}_Report.pdf';
+
+        if (Platform.isAndroid || Platform.isIOS) {
+          await Printing.sharePdf(bytes: bytes, filename: pdfName);
+        } else {
+          await Printing.layoutPdf(onLayout: (_) async => bytes, name: pdfName);
+        }
+      } else if (result == 'excel') {
+        final filePath = await ExportService().exportMiscellaneousToExcel(
+          schemeId: widget.initialSchemeId,
+          setId: widget.initialSetId,
+        );
+        if (!mounted) return;
+
+        final file = File(filePath);
+        if (Platform.isAndroid || Platform.isIOS) {
+          await Printing.sharePdf(
+            bytes: await file.readAsBytes(),
+            filename: filePath.split(Platform.pathSeparator).last,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Excel saved to: $filePath')),
+          );
+        }
+      } else if (result == 'csv') {
+        final filePath = await ExportService().exportMiscellaneousToCsv(
+          schemeId: widget.initialSchemeId,
+          setId: widget.initialSetId,
+        );
+        if (!mounted) return;
+
+        final file = File(filePath);
+        if (Platform.isAndroid || Platform.isIOS) {
+          await Printing.sharePdf(
+            bytes: await file.readAsBytes(),
+            filename: filePath.split(Platform.pathSeparator).last,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('CSV saved to: $filePath')),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error exporting: $e')),
+      );
+    }
   }
 
   Future<void> _showRecordDialog({_MiscRecord? existing}) async {
@@ -361,6 +474,13 @@ class _MiscellaneousScreenState extends State<MiscellaneousScreen> {
               ? 'Miscellaneous'
               : 'Miscellaneous — ${widget.initialSchemeName}',
         ),
+        actions: [
+          IconButton(
+            onPressed: _showExportOptions,
+            icon: const Icon(Icons.print_outlined),
+            tooltip: 'Print / Export',
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addRecord,
@@ -710,6 +830,112 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
     Navigator.pop(context, _record);
   }
 
+  Future<void> _showExportOptions() async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf),
+              title: const Text('Export as PDF'),
+              subtitle: const Text('Professional A4 report for this record'),
+              onTap: () => Navigator.pop(ctx, 'pdf'),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined),
+              title: const Text('Export as Excel'),
+              subtitle: const Text('Spreadsheet format for data entry'),
+              onTap: () => Navigator.pop(ctx, 'excel'),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.code),
+              title: const Text('Export as CSV'),
+              subtitle: const Text('Plain text comma-separated values'),
+              onTap: () => Navigator.pop(ctx, 'csv'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      if (result == 'pdf') {
+        final savedHeader = await ExportService.loadHeaderText();
+        final headerText = await ExportService.showHeaderEditDialog(
+          context,
+          currentHeader: savedHeader,
+        );
+        if (!mounted) return;
+        final effectiveHeader = (headerText != null && headerText.isNotEmpty)
+            ? headerText
+            : savedHeader;
+
+        final bytes = await ExportService().exportMiscellaneousToPdf(
+          recordId: _record.id,
+        );
+        if (!mounted) return;
+
+        if (headerText != null && headerText.isNotEmpty) {
+          await ExportService.saveHeaderText(headerText);
+        }
+
+        final baseName = '${_record.title}_Report'
+            .replaceAll(RegExp(r'[^\w\s]'), '_');
+        final pdfName = '$baseName.pdf';
+
+        if (Platform.isAndroid || Platform.isIOS) {
+          await Printing.sharePdf(bytes: bytes, filename: pdfName);
+        } else {
+          await Printing.layoutPdf(onLayout: (_) async => bytes, name: pdfName);
+        }
+      } else if (result == 'excel') {
+        final filePath = await ExportService().exportMiscellaneousToExcel(
+          recordId: _record.id,
+        );
+        if (!mounted) return;
+
+        final file = File(filePath);
+        if (Platform.isAndroid || Platform.isIOS) {
+          await Printing.sharePdf(
+            bytes: await file.readAsBytes(),
+            filename: filePath.split(Platform.pathSeparator).last,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Excel saved to: $filePath')),
+          );
+        }
+      } else if (result == 'csv') {
+        final filePath = await ExportService().exportMiscellaneousToCsv(
+          recordId: _record.id,
+        );
+        if (!mounted) return;
+
+        final file = File(filePath);
+        if (Platform.isAndroid || Platform.isIOS) {
+          await Printing.sharePdf(
+            bytes: await file.readAsBytes(),
+            filename: filePath.split(Platform.pathSeparator).last,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('CSV saved to: $filePath')),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error exporting: $e')),
+      );
+    }
+  }
+
   Future<bool> _onWillPop() async {
     _saveAndClose();
     return false;
@@ -728,6 +954,11 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
           title: Text(_record.title),
           actions: [
             IconButton(
+              onPressed: _showExportOptions,
+              icon: const Icon(Icons.print_outlined),
+              tooltip: 'Print / Export',
+            ),
+            IconButton(
               onPressed: _saveAndClose,
               icon: const Icon(Icons.check),
               tooltip: 'Save',
@@ -739,18 +970,89 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
           children: [
             Card(
               child: Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Category: ${_record.category}'),
-                    const SizedBox(height: 4),
-                    Text('Scheme: ${_record.schemeName ?? 'Unassigned'}'),
-                    const SizedBox(height: 4),
-                    Text('Set: ${_record.setLabel ?? 'Unassigned'}'),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Total: Rs. ${_record.totalAmount.toStringAsFixed(0)}',
+                    Row(
+                      children: [
+                        const Icon(Icons.category_outlined, size: 18, color: Colors.blueGrey),
+                        const SizedBox(width: 8),
+                        Text(
+                          _record.category,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.account_tree_outlined, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Scheme',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _record.schemeName ?? 'Unassigned Scheme',
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.inventory_2_outlined, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Set',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                _record.setLabel ?? 'Unassigned Set',
+                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.receipt_long_outlined, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Expenditures: ${_record.entries.length}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const Spacer(),
+                        Text(
+                          'Total: Rs. ${_record.totalAmount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

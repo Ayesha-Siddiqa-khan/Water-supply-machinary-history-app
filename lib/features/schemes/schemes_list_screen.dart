@@ -15,6 +15,7 @@ class SchemesListScreen extends StatefulWidget {
   final String addButtonLabel;
   final int? parentSchemeId;
   final int? parentSetId;
+  final List<Widget>? appBarActions;
 
   const SchemesListScreen({
     super.key,
@@ -25,6 +26,7 @@ class SchemesListScreen extends StatefulWidget {
     this.addButtonLabel = 'Add Scheme',
     this.parentSchemeId,
     this.parentSetId,
+    this.appBarActions,
   });
 
   @override
@@ -142,6 +144,7 @@ class _SchemesListScreenState extends State<SchemesListScreen> {
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
+          if (widget.appBarActions != null) ...widget.appBarActions!,
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadSchemes),
         ],
       ),

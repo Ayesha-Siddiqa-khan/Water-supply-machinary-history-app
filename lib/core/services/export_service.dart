@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -12,10 +13,12 @@ import '../database/daos/sets_dao.dart';
 import '../database/daos/machinery_dao.dart';
 import '../database/daos/billing_entries_dao.dart';
 import '../database/daos/miscellaneous_dao.dart';
+import '../database/daos/settings_dao.dart';
 import '../models/machinery.dart';
 import '../models/set_model.dart';
 import '../models/scheme.dart';
 import '../models/billing_entry.dart';
+import '../models/equipment_specs.dart';
 
 class ExportService {
   final SchemesDao _schemesDao = SchemesDao();
@@ -44,6 +47,73 @@ class ExportService {
 
   pw.ThemeData _pdfTheme() {
     return pw.ThemeData.withFont(base: _baseFont!, bold: _boldFont!);
+  }
+
+  static const String _headerSettingKey = 'report_header_text';
+
+  static Future<String?> showHeaderEditDialog(BuildContext context, {String? currentHeader}) async {
+    final controller = TextEditingController(text: currentHeader ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Report Header'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Customize the heading text that appears at the top of the PDF report.',
+              style: TextStyle(fontSize: 13, color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Report Title',
+                hintText: 'e.g., Canal Water Works Machinery Record',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, ''),
+              child: const Text('Reset to Default'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+    return result;
+  }
+
+  static Future<void> saveHeaderText(String text) async {
+    final settingsDao = SettingsDao();
+    if (text.isEmpty) {
+      await settingsDao.setSetting(_headerSettingKey, '');
+    } else {
+      await settingsDao.setSetting(_headerSettingKey, text);
+    }
+  }
+
+  static Future<String?> loadHeaderText() async {
+    final settingsDao = SettingsDao();
+    final saved = await settingsDao.getSetting(_headerSettingKey);
+    if (saved != null && saved.trim().isNotEmpty) {
+      return saved.trim();
+    }
+    return null;
   }
 
   final MachineryDao _machineryDao = MachineryDao();
@@ -317,14 +387,16 @@ class ExportService {
   Future<Uint8List> exportSetToPdf(
     int setId, {
     bool includeSpecs = false,
+    String? headerText,
   }) async {
-    return _exportSetToPdfInternal(setId, includeSpecs: includeSpecs);
+    return _exportSetToPdfInternal(setId, includeSpecs: includeSpecs, headerText: headerText);
   }
 
   Future<Uint8List> exportSingleMachineryToPdf(
     int setId,
-    int machineryId,
-  ) async {
+    int machineryId, {
+    String? headerText,
+  }) async {
     final machineryList = await _machineryDao.getMachineryForSet(setId);
     final selected = machineryList
         .where((m) => m.machineryId == machineryId)
@@ -332,13 +404,14 @@ class ExportService {
     if (selected == null) {
       throw Exception('Selected machinery not found');
     }
-    return _exportSetToPdfInternal(setId, machineryOverride: [selected]);
+    return _exportSetToPdfInternal(setId, machineryOverride: [selected], headerText: headerText);
   }
 
   Future<Uint8List> _exportSetToPdfInternal(
     int setId, {
     List<Machinery>? machineryOverride,
     bool includeSpecs = false,
+    String? headerText,
   }) async {
     await _ensureFontsLoaded();
     final setModel = await _setsDao.getSetById(setId);
@@ -407,7 +480,7 @@ class ExportService {
             if (isUselessScheme) ...[
               pw.SizedBox(height: 2),
               pw.Text(
-                'Useless Items Transfer Report',
+                headerText ?? 'Useless Items Transfer Report',
                 textAlign: pw.TextAlign.left,
                 style: pw.TextStyle(
                   fontSize: 10,
@@ -802,6 +875,7 @@ class ExportService {
     required List<Machinery> machineryList,
     required Map<int, List<BillingEntry>> entriesByMachineryId,
     bool includeSpecs = false,
+    String? headerText,
   }) async {
     await _ensureFontsLoaded();
     final pdf = pw.Document(theme: _pdfTheme());
@@ -838,7 +912,7 @@ class ExportService {
 
     final content = <pw.Widget>[
       pw.Text(
-        'Water Supply Scheme History',
+        headerText ?? 'Water Supply Scheme History',
         textAlign: pw.TextAlign.center,
         style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
       ),
@@ -953,12 +1027,147 @@ class ExportService {
     return pdf.save();
   }
 
+  Future<Uint8List> buildUselessItemsRegister({
+    required Scheme scheme,
+    required List<SetModel> sets,
+    required Map<int, List<Machinery>> machineryBySetId,
+    required Map<int, List<BillingEntry>> entriesByMachineryId,
+    String? headerText,
+  }) async {
+    await _ensureFontsLoaded();
+    final pdf = pw.Document(theme: _pdfTheme());
+
+    final headerStyle = pw.TextStyle(
+      fontSize: 8,
+      fontWeight: pw.FontWeight.bold,
+      color: PdfColors.black,
+      fontFallback: _fontFallback ?? [],
+    );
+    final cellStyle = pw.TextStyle(
+      fontSize: 7,
+      fontFallback: _fontFallback ?? [],
+    );
+    final tableBorder = pw.TableBorder.all(
+      color: PdfColors.grey600,
+      width: 0.5,
+    );
+
+    int srNo = 0;
+    final tableRows = <List<String>>[];
+
+    for (final set in sets) {
+      final machineryList = machineryBySetId[set.setId!] ?? const [];
+      for (final machinery in machineryList) {
+        final entries = entriesByMachineryId[machinery.machineryId!] ?? const [];
+        for (final entry in entries) {
+          srNo++;
+          tableRows.add([
+            '$srNo',
+            entry.entryDate,
+            scheme.schemeName,
+            set.setLabel,
+            machinery.displayLabel,
+            entry.isDisabled ? 'Disabled/Closed' : 'Active',
+            entry.submittedToStoreDate ?? '-',
+            entry.transferDate ?? '-',
+            entry.transferredToScheme ?? '-',
+            entry.regPageNo ?? '-',
+            entry.remarks ?? entry.notes ?? '-',
+          ]);
+        }
+      }
+    }
+
+    final content = <pw.Widget>[
+      pw.Text(
+        headerText ?? 'Useless Items Register',
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+      ),
+      pw.SizedBox(height: 2),
+      pw.Text(
+        scheme.schemeName,
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(fontSize: 12),
+      ),
+      pw.SizedBox(height: 2),
+      pw.Text(
+        'Total Items: $srNo | Printed on ${_nowFormatted()}',
+        textAlign: pw.TextAlign.center,
+        style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+      ),
+      pw.SizedBox(height: 10),
+    ];
+
+    if (tableRows.isEmpty) {
+      content.add(
+        pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(vertical: 20),
+          child: pw.Text(
+            'No useless items found.',
+            textAlign: pw.TextAlign.center,
+            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
+          ),
+        ),
+      );
+    } else {
+      content.add(
+        pw.TableHelper.fromTextArray(
+          headers: [
+            'Sr.No',
+            'Date',
+            'Scheme',
+            'Set',
+            'Item',
+            'Status',
+            'Store Date',
+            'Transfer Date',
+            'Transferred To',
+            'Reg. Page',
+            'Remarks',
+          ],
+          data: tableRows,
+          headerStyle: headerStyle,
+          headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+          headerAlignment: pw.Alignment.center,
+          cellStyle: cellStyle,
+          cellAlignment: pw.Alignment.center,
+          cellPadding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+          border: tableBorder,
+          columnWidths: {
+            0: const pw.FlexColumnWidth(0.6),
+            1: const pw.FlexColumnWidth(1.0),
+            2: const pw.FlexColumnWidth(1.5),
+            3: const pw.FlexColumnWidth(1.0),
+            4: const pw.FlexColumnWidth(1.2),
+            5: const pw.FlexColumnWidth(0.9),
+            6: const pw.FlexColumnWidth(1.0),
+            7: const pw.FlexColumnWidth(1.0),
+            8: const pw.FlexColumnWidth(1.2),
+            9: const pw.FlexColumnWidth(0.7),
+            10: const pw.FlexColumnWidth(1.5),
+          },
+        ),
+      );
+    }
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(14),
+        build: (context) => content,
+      ),
+    );
+
+    return pdf.save();
+  }
+
   static bool _containsArabic(String text) {
     // Arabic Unicode block: U+0600–U+06FF (covers Arabic, Urdu, Persian)
     return text.runes.any((r) => r >= 0x0600 && r <= 0x06FF);
   }
 
-  Future<Uint8List> exportSchemeToPdf(int schemeId) async {
+  Future<Uint8List> exportSchemeToPdf(int schemeId, {String? headerText}) async {
     await _ensureFontsLoaded();
     final scheme = await _schemesDao.getSchemeById(schemeId);
     if (scheme == null) throw Exception('Scheme not found');
@@ -1565,6 +1774,7 @@ class ExportService {
 
   Future<Uint8List> exportAllMachineryToPdf({
     bool includeSpecs = false,
+    String? headerText,
   }) async {
     await _ensureFontsLoaded();
     final schemes = await _schemesDao.getAllSchemes();
@@ -1590,7 +1800,7 @@ class ExportService {
             crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
               pw.Text(
-                'Water Supply Scheme History - Complete Machinery Export',
+                headerText ?? 'Water Supply Scheme History - Complete Machinery Export',
                 textAlign: pw.TextAlign.center,
                 style: pw.TextStyle(
                   fontSize: 16,
@@ -1736,7 +1946,7 @@ class ExportService {
               crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
                 pw.Text(
-                  'Water Supply Scheme History - Complete Machinery Export',
+                  headerText ?? 'Water Supply Scheme History - Complete Machinery Export',
                   textAlign: pw.TextAlign.center,
                   style: pw.TextStyle(
                     fontSize: 16,
@@ -1925,6 +2135,43 @@ class ExportService {
               final isContinued = !(blockIndex == 0 && start == 0);
               addSetHeader(continued: isContinued);
 
+              if (start == 0) {
+                final setInfoEntries = setModel.details.entries
+                    .where((e) => e.value.trim().isNotEmpty)
+                    .toList();
+                if (setInfoEntries.isNotEmpty) {
+                  final infoHeaders = setDetailFields
+                      .where((f) => setModel.details[f]?.trim().isNotEmpty == true)
+                      .toList();
+                  if (infoHeaders.isNotEmpty) {
+                    final infoRow = infoHeaders
+                        .map((f) => setModel.details[f] ?? '')
+                        .toList();
+                    setWidgets.add(
+                      pw.TableHelper.fromTextArray(
+                        headers: infoHeaders,
+                        data: [infoRow],
+                        headerStyle: pw.TextStyle(
+                          fontSize: 7,
+                          fontWeight: pw.FontWeight.bold,
+                          fontFallback: _fontFallback ?? [],
+                        ),
+                        headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+                        headerAlignment: pw.Alignment.center,
+                        cellStyle: pw.TextStyle(
+                          fontSize: 7,
+                          fontFallback: _fontFallback ?? [],
+                        ),
+                        cellAlignment: pw.Alignment.center,
+                        cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                        border: pw.TableBorder.all(color: PdfColors.grey500, width: 0.5),
+                      ),
+                    );
+                    setWidgets.add(pw.SizedBox(height: 4));
+                  }
+                }
+              }
+
               if (includeSpecs && start == 0) {
                 for (final machinery in block) {
                   final specs = machinery.specs.entries
@@ -2083,7 +2330,7 @@ class ExportService {
               crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
                 pw.Text(
-                  'Water Supply Scheme History - Complete Machinery Export',
+                  headerText ?? 'Water Supply Scheme History - Complete Machinery Export',
                   textAlign: pw.TextAlign.center,
                   style: pw.TextStyle(
                     fontSize: 16,

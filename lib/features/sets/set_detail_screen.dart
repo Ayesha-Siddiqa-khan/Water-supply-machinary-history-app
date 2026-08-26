@@ -88,57 +88,101 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
 
   Future<void> _printReport() async {
     if (_set == null) return;
-    final includeSpecs = await showModalBottomSheet<bool>(
+    final isUseless = _isUselessItemFlow;
+    final result = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (isUseless) ...[
+              ListTile(
+                leading: const Icon(Icons.table_chart_outlined),
+                title: const Text('Print Useless Items Register'),
+                subtitle: const Text('Professional landscape register with all item details'),
+                onTap: () => Navigator.pop(ctx, 'register'),
+              ),
+              const Divider(height: 1),
+            ],
             ListTile(
               leading: const Icon(Icons.print),
               title: const Text('Print without Specifications'),
               subtitle: const Text('Equipment info and billing entries only'),
-              onTap: () => Navigator.pop(ctx, false),
+              onTap: () => Navigator.pop(ctx, 'basic'),
             ),
             ListTile(
               leading: const Icon(Icons.fact_check_outlined),
               title: const Text('Print with Full Specifications'),
               subtitle: const Text('Includes specification tables for every equipment'),
-              onTap: () => Navigator.pop(ctx, true),
+              onTap: () => Navigator.pop(ctx, 'specs'),
             ),
           ],
         ),
       ),
     );
-    if (includeSpecs == null || !mounted || _set == null) return;
+    if (result == null || !mounted || _set == null) return;
+
+    final savedHeader = await ExportService.loadHeaderText();
+    final headerText = await ExportService.showHeaderEditDialog(
+      context,
+      currentHeader: savedHeader,
+    );
+    if (!mounted) return;
+    final effectiveHeader = (headerText != null && headerText.isNotEmpty) ? headerText : savedHeader;
 
     Uint8List? bytes;
+    String pdfName;
     try {
-      bytes = await ExportService().buildSetDetailReport(
-        set: _set!,
-        scheme: _scheme,
-        machineryList: [for (final mw in _machineryList) mw.machinery],
-        entriesByMachineryId: {
-          for (final mw in _machineryList) mw.machinery.machineryId!: mw.entries,
-        },
-        includeSpecs: includeSpecs,
-      );
+      if (result == 'register' && _scheme != null) {
+        final setsDao = SetsDao();
+        final sets = await setsDao.getSetsForScheme(_set!.schemeId);
+        final machineryBySetId = <int, List<Machinery>>{};
+        final entriesByMachineryId = <int, List<BillingEntry>>{};
+        for (final set in sets) {
+          final machineryList = await _machineryDao.getMachineryForSet(set.setId!);
+          machineryBySetId[set.setId!] = machineryList;
+          for (final m in machineryList) {
+            entriesByMachineryId[m.machineryId!] =
+                await _entriesDao.getEntriesForMachinery(m.machineryId!);
+          }
+        }
+        bytes = await ExportService().buildUselessItemsRegister(
+          scheme: _scheme!,
+          sets: sets,
+          machineryBySetId: machineryBySetId,
+          entriesByMachineryId: entriesByMachineryId,
+          headerText: effectiveHeader,
+        );
+        pdfName = '${_scheme!.schemeName}_Useless_Items_Register.pdf'
+            .replaceAll(RegExp(r'[^\w\s]'), '_');
+      } else {
+        bytes = await ExportService().buildSetDetailReport(
+          set: _set!,
+          scheme: _scheme,
+          machineryList: [for (final mw in _machineryList) mw.machinery],
+          entriesByMachineryId: {
+            for (final mw in _machineryList) mw.machinery.machineryId!: mw.entries,
+          },
+          includeSpecs: result == 'specs',
+          headerText: effectiveHeader,
+        );
+        final baseName =
+            '${_scheme?.schemeName ?? 'Scheme'} ${_set!.setLabel}'.replaceAll(RegExp(r'[^\w\s]'), '_');
+        pdfName = '${baseName}_Report.pdf';
+      }
       if (!mounted) return;
 
-      final baseName =
-          '${_scheme?.schemeName ?? 'Scheme'} ${_set!.setLabel}'.replaceAll(RegExp(r'[^\w\s]'), '_');
-      final pdfName = '${baseName}_Report.pdf';
+      if (headerText != null && headerText.isNotEmpty) {
+        await ExportService.saveHeaderText(headerText);
+      }
 
       if (Platform.isAndroid || Platform.isIOS) {
-        // Mobile: the share sheet offers Print, WhatsApp, email, save to Files.
         await Printing.sharePdf(bytes: bytes, filename: pdfName);
       } else {
-        // Desktop: system print dialog.
         await Printing.layoutPdf(onLayout: (_) async => bytes!, name: pdfName);
       }
     } catch (e) {
       if (!mounted) return;
-      // Fallback: save the PDF so it can be printed from any viewer.
       try {
         if (bytes == null) throw e;
         final dir = await getApplicationDocumentsDirectory();
