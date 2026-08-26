@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:file_picker/file_picker.dart';
+import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/database/daos/schemes_dao.dart';
 import '../../core/database/daos/sets_dao.dart';
@@ -217,7 +218,9 @@ class _ExportScreenState extends State<ExportScreen> {
         setState(() => _isExporting = false);
         return;
       }
-      effectiveHeader = (headerText != null && headerText.isNotEmpty) ? headerText : savedHeader;
+      effectiveHeader = (headerText != null && headerText.isNotEmpty)
+          ? headerText
+          : savedHeader;
     }
 
     try {
@@ -381,6 +384,34 @@ class _ExportScreenState extends State<ExportScreen> {
 
       if (mounted) {
         _showExportSuccess(filePath, suggestedFileName: filename);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l10n.exportErrorPrefix}: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<void> _printAllMachineryPdf() async {
+    final l10n = AppLocalizations.of(context)!;
+    setState(() => _isExporting = true);
+
+    try {
+      final pdfBytes = await _exportService.exportAllMachineryToPdf(
+        includeSpecs: _includeSpecs,
+      );
+      const filename = 'Complete_Machinery_Report.pdf';
+      if (Platform.isAndroid || Platform.isIOS) {
+        await Printing.sharePdf(bytes: pdfBytes, filename: filename);
+      } else {
+        await Printing.layoutPdf(
+          onLayout: (_) async => pdfBytes,
+          name: filename,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -1039,6 +1070,17 @@ class _ExportScreenState extends State<ExportScreen> {
                         : _exportAllMachineryPdf,
                     icon: const Icon(Icons.picture_as_pdf),
                     label: Text(l10n.exportAllMachinerySinglePdf),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: (_isExporting || _exportScope == 'miscellaneous')
+                        ? null
+                        : _printAllMachineryPdf,
+                    icon: const Icon(Icons.print),
+                    label: const Text('Print All Machinery (All Pages)'),
                   ),
                 ),
               ],

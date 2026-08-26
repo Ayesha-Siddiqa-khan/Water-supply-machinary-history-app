@@ -42,7 +42,8 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
   List<_MachineryWithEntries> _machineryList = [];
   bool _isLoading = true;
 
-  bool get _isUselessItemFlow => (_scheme?.category ?? '').toLowerCase() == 'useless_item';
+  bool get _isUselessItemFlow =>
+      (_scheme?.category ?? '').toLowerCase() == 'useless_item';
 
   @override
   void initState() {
@@ -60,12 +61,18 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
       }
 
       final scheme = await _schemesDao.getSchemeById(set.schemeId);
-      final machineryList = await _machineryDao.getMachineryForSet(widget.setId);
+      final machineryList = await _machineryDao.getMachineryForSet(
+        widget.setId,
+      );
 
       final List<_MachineryWithEntries> machWithEntries = [];
       for (final m in machineryList) {
-        final entries = await _entriesDao.getEntriesForMachinery(m.machineryId!);
-        machWithEntries.add(_MachineryWithEntries(machinery: m, entries: entries));
+        final entries = await _entriesDao.getEntriesForMachinery(
+          m.machineryId!,
+        );
+        machWithEntries.add(
+          _MachineryWithEntries(machinery: m, entries: entries),
+        );
       }
 
       if (mounted) {
@@ -79,9 +86,9 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -99,7 +106,9 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
               ListTile(
                 leading: const Icon(Icons.table_chart_outlined),
                 title: const Text('Print Useless Items Register'),
-                subtitle: const Text('Professional landscape register with all item details'),
+                subtitle: const Text(
+                  'Professional landscape register with all item details',
+                ),
                 onTap: () => Navigator.pop(ctx, 'register'),
               ),
               const Divider(height: 1),
@@ -113,7 +122,9 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
             ListTile(
               leading: const Icon(Icons.fact_check_outlined),
               title: const Text('Print with Full Specifications'),
-              subtitle: const Text('Includes specification tables for every equipment'),
+              subtitle: const Text(
+                'Includes specification tables for every equipment',
+              ),
               onTap: () => Navigator.pop(ctx, 'specs'),
             ),
           ],
@@ -128,7 +139,9 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
       currentHeader: savedHeader,
     );
     if (!mounted) return;
-    final effectiveHeader = (headerText != null && headerText.isNotEmpty) ? headerText : savedHeader;
+    final effectiveHeader = (headerText != null && headerText.isNotEmpty)
+        ? headerText
+        : savedHeader;
 
     Uint8List? bytes;
     String pdfName;
@@ -139,11 +152,13 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
         final machineryBySetId = <int, List<Machinery>>{};
         final entriesByMachineryId = <int, List<BillingEntry>>{};
         for (final set in sets) {
-          final machineryList = await _machineryDao.getMachineryForSet(set.setId!);
+          final machineryList = await _machineryDao.getMachineryForSet(
+            set.setId!,
+          );
           machineryBySetId[set.setId!] = machineryList;
           for (final m in machineryList) {
-            entriesByMachineryId[m.machineryId!] =
-                await _entriesDao.getEntriesForMachinery(m.machineryId!);
+            entriesByMachineryId[m.machineryId!] = await _entriesDao
+                .getEntriesForMachinery(m.machineryId!);
           }
         }
         bytes = await ExportService().buildUselessItemsRegister(
@@ -161,13 +176,14 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
           scheme: _scheme,
           machineryList: [for (final mw in _machineryList) mw.machinery],
           entriesByMachineryId: {
-            for (final mw in _machineryList) mw.machinery.machineryId!: mw.entries,
+            for (final mw in _machineryList)
+              mw.machinery.machineryId!: mw.entries,
           },
           includeSpecs: result == 'specs',
           headerText: effectiveHeader,
         );
-        final baseName =
-            '${_scheme?.schemeName ?? 'Scheme'} ${_set!.setLabel}'.replaceAll(RegExp(r'[^\w\s]'), '_');
+        final baseName = '${_scheme?.schemeName ?? 'Scheme'} ${_set!.setLabel}'
+            .replaceAll(RegExp(r'[^\w\s]'), '_');
         pdfName = '${baseName}_Report.pdf';
       }
       if (!mounted) return;
@@ -192,7 +208,11 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
         await file.writeAsBytes(bytes);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Could not open print dialog. PDF saved to: ${file.path}')),
+            SnackBar(
+              content: Text(
+                'Could not open print dialog. PDF saved to: ${file.path}',
+              ),
+            ),
           );
         }
       } catch (_) {
@@ -285,9 +305,14 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Machinery'),
-        content: Text('Delete "${machinery.displayLabel}" and all its billing entries?'),
+        content: Text(
+          'Delete "${machinery.displayLabel}" and all its billing entries?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -339,9 +364,14 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Entry'),
-        content: Text('Delete entry #${entry.serialNo} (${CurrencyUtils.formatAmount(entry.amount)})?'),
+        content: Text(
+          'Delete entry #${entry.serialNo} (${CurrencyUtils.formatAmount(entry.amount)})?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -373,7 +403,11 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
             onPressed: _printReport,
             tooltip: 'Print Report',
           ),
-          IconButton(icon: const Icon(Icons.add), onPressed: _addMachinery, tooltip: 'Add Machinery'),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _addMachinery,
+            tooltip: 'Add Machinery',
+          ),
         ],
       ),
       body: _isLoading
@@ -387,14 +421,25 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                         Center(
                           child: Column(
                             children: [
-                              Icon(Icons.precision_manufacturing_outlined,
-                                  size: 64, color: AppColors.textHint),
+                              Icon(
+                                Icons.precision_manufacturing_outlined,
+                                size: 64,
+                                color: AppColors.textHint,
+                              ),
                               const SizedBox(height: 12),
-                              Text('No machinery yet',
-                                  style: Theme.of(context).textTheme.headlineSmall),
+                              Text(
+                                'No machinery yet',
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall,
+                              ),
                               const SizedBox(height: 8),
-                              Text('Add a machinery sub-head to start',
-                                  style: TextStyle(color: AppColors.textSecondary)),
+                              Text(
+                                'Add a machinery sub-head to start',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                               const SizedBox(height: 24),
                               ElevatedButton.icon(
                                 onPressed: _addMachinery,
@@ -425,19 +470,24 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                             padding: const EdgeInsets.all(16),
                             child: isCompact
                                 ? Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
                                           Expanded(
                                             child: Text(
                                               _set!.setLabel,
-                                              style: Theme.of(context).textTheme.titleLarge,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.titleLarge,
                                             ),
                                           ),
                                           IconButton(
                                             onPressed: _editSet,
-                                            icon: const Icon(Icons.edit_outlined),
+                                            icon: const Icon(
+                                              Icons.edit_outlined,
+                                            ),
                                             tooltip: 'Edit Set',
                                           ),
                                         ],
@@ -446,7 +496,10 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                                         const SizedBox(height: 2),
                                         Text(
                                           '${_scheme!.schemeName} ${_set!.setLabel.replaceFirst('Set No. ', 'Set No.')}',
-                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
                                                 fontWeight: FontWeight.w600,
                                               ),
                                         ),
@@ -463,7 +516,9 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                                       const SizedBox(height: 6),
                                       Text(
                                         '${_machineryList.length} machinery',
-                                        style: Theme.of(context).textTheme.bodySmall,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
                                       ),
                                     ],
                                   )
@@ -471,16 +526,25 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                                     children: [
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            Text(_set!.setLabel,
-                                                style: Theme.of(context).textTheme.titleLarge),
+                                            Text(
+                                              _set!.setLabel,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.titleLarge,
+                                            ),
                                             if (_scheme != null) ...[
                                               const SizedBox(height: 2),
                                               Text(
                                                 '${_scheme!.schemeName} ${_set!.setLabel.replaceFirst('Set No. ', 'Set No.')}',
-                                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                                      fontWeight: FontWeight.w600,
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .bodyMedium
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                     ),
                                               ),
                                             ],
@@ -495,7 +559,7 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                                             ),
                                           ],
                                         ),
-                                       ),
+                                      ),
                                       IconButton(
                                         onPressed: _editSet,
                                         icon: const Icon(Icons.edit_outlined),
@@ -503,7 +567,9 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                                       ),
                                       Text(
                                         '${_machineryList.length} machinery',
-                                        style: Theme.of(context).textTheme.bodySmall,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
                                       ),
                                     ],
                                   ),
@@ -520,8 +586,11 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.location_on_outlined,
-                                        size: 18, color: AppColors.primary),
+                                    const Icon(
+                                      Icons.location_on_outlined,
+                                      size: 18,
+                                      color: AppColors.primary,
+                                    ),
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
@@ -529,7 +598,9 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                                         style: Theme.of(context)
                                             .textTheme
                                             .titleSmall
-                                            ?.copyWith(fontWeight: FontWeight.w600),
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                       ),
                                     ),
                                     IconButton(
@@ -554,7 +625,9 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                         const SizedBox(height: 16),
 
                         // Machinery sections
-                        ..._machineryList.map((mw) => _buildMachinerySection(mw)),
+                        ..._machineryList.map(
+                          (mw) => _buildMachinerySection(mw),
+                        ),
 
                         const SizedBox(height: 80),
                       ],
@@ -580,7 +653,9 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
         leading: _getMachineryIcon(machinery.machineryType),
         title: Text(
           machinery.displayLabel,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
           '${entries.length} entries · Total: ${CurrencyUtils.formatAmount(totalAmount)}',
@@ -593,7 +668,10 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
           },
           itemBuilder: (ctx) => [
             const PopupMenuItem(value: 'add_entry', child: Text('Add Entry')),
-            const PopupMenuItem(value: 'delete', child: Text('Delete Machinery')),
+            const PopupMenuItem(
+              value: 'delete',
+              child: Text('Delete Machinery'),
+            ),
           ],
         ),
         children: [
@@ -605,29 +683,40 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.fact_check_outlined,
-                        size: 18, color: AppColors.primary),
+                    const Icon(
+                      Icons.fact_check_outlined,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         '${machinery.machineryType} Specifications',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w600),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.copy_all_outlined, size: 18),
                       tooltip: 'Copy Specifications',
                       onPressed: () {
-                        if (machinery.specs.values.every((v) => v.trim().isEmpty)) {
+                        if (machinery.specs.values.every(
+                          (v) => v.trim().isEmpty,
+                        )) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('No specifications to copy on this equipment')),
+                            const SnackBar(
+                              content: Text(
+                                'No specifications to copy on this equipment',
+                              ),
+                            ),
                           );
                           return;
                         }
-                        SpecClipboard.copy(machinery.machineryType, machinery.specs);
+                        SpecClipboard.copy(
+                          machinery.machineryType,
+                          machinery.specs,
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
@@ -660,75 +749,160 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
           if (entries.isEmpty)
             const Padding(
               padding: EdgeInsets.all(16),
-              child: Text('No billing entries yet.', style: TextStyle(color: AppColors.textSecondary)),
+              child: Text(
+                'No billing entries yet.',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
             )
           else
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: DataTable(
                 columnSpacing: 16,
-                headingRowColor: WidgetStateProperty.all(AppColors.primary.withOpacity(0.05)),
+                headingRowColor: WidgetStateProperty.all(
+                  AppColors.primary.withOpacity(0.05),
+                ),
                 columns: [
-                  DataColumn(label: Text('Sr.No', style: TextStyle(fontWeight: FontWeight.bold))),
-                  if (!isUseless)
-                    DataColumn(label: Text('Date', style: TextStyle(fontWeight: FontWeight.bold))),
-                  if (!isUseless)
-                    DataColumn(label: Text('Work Order No.', style: TextStyle(fontWeight: FontWeight.bold))),
-                  if (!isUseless)
-                    DataColumn(label: Text('Voucher No.', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(
+                    label: Text(
+                      'Sr.No',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
                   if (!isUseless)
                     DataColumn(
-                      label: Text('Amount (PKR)', style: TextStyle(fontWeight: FontWeight.bold)),
+                      label: Text(
+                        'Date',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  if (!isUseless)
+                    DataColumn(
+                      label: Text(
+                        'Work Order No.',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  if (!isUseless)
+                    DataColumn(
+                      label: Text(
+                        'Voucher No.',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  if (!isUseless)
+                    DataColumn(
+                      label: Text(
+                        'Amount (PKR)',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       numeric: true,
                     ),
-                  DataColumn(label: Text('Reg. Page No.', style: TextStyle(fontWeight: FontWeight.bold))),
+                  DataColumn(
+                    label: Text(
+                      'Reg. Page No.',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
                   if (isUseless)
-                    DataColumn(label: Text('Disabled/Closed', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(
+                      label: Text(
+                        'Disabled/Closed',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   if (isUseless)
-                    DataColumn(label: Text('Submitted To Store', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(
+                      label: Text(
+                        'Submitted To Store',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   if (isUseless)
-                    DataColumn(label: Text('Transfer Date', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(
+                      label: Text(
+                        'Transfer Date',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   if (isUseless)
-                    DataColumn(label: Text('Transferred To Scheme', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(
+                      label: Text(
+                        'Transferred To Scheme',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                   if (isUseless)
-                    DataColumn(label: Text('Remarks', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataColumn(label: Text('Actions', style: TextStyle(fontWeight: FontWeight.bold))),
+                    DataColumn(
+                      label: Text(
+                        'Remarks',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  DataColumn(
+                    label: Text(
+                      'Actions',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ],
-                rows: entries.map((e) => DataRow(
-                  cells: [
-                    DataCell(Text('${e.serialNo}')),
-                    if (!isUseless) DataCell(Text(e.entryDate)),
-                    if (!isUseless) DataCell(Text(e.workOrderNo ?? '-')),
-                    if (!isUseless) DataCell(Text(e.voucherNo?.toString() ?? '-')),
-                    if (!isUseless) DataCell(Text(CurrencyUtils.formatAmount(e.amount))),
-                    DataCell(Text(e.regPageNo ?? '-')),
-                    if (isUseless) DataCell(Text(e.isDisabled ? 'Yes' : 'No')),
-                    if (isUseless) DataCell(Text(e.submittedToStoreDate ?? '-')),
-                    if (isUseless) DataCell(Text(e.transferDate ?? '-')),
-                    if (isUseless) DataCell(Text(e.transferredToScheme ?? '-')),
-                    if (isUseless) DataCell(Text(e.remarks ?? e.notes ?? '-')),
-                    DataCell(Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 18, color: AppColors.primary),
-                          onPressed: () => _editEntry(e),
-                          tooltip: 'Edit',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.delete, size: 18, color: AppColors.error),
-                          onPressed: () => _deleteEntry(e),
-                          tooltip: 'Delete',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                      ],
-                    )),
-                  ],
-                )).toList(),
+                rows: entries
+                    .map(
+                      (e) => DataRow(
+                        cells: [
+                          DataCell(Text('${e.serialNo}')),
+                          if (!isUseless) DataCell(Text(e.entryDate)),
+                          if (!isUseless) DataCell(Text(e.workOrderNo ?? '-')),
+                          if (!isUseless)
+                            DataCell(Text(e.voucherNo?.toString() ?? '-')),
+                          if (!isUseless)
+                            DataCell(
+                              Text(CurrencyUtils.formatAmount(e.amount)),
+                            ),
+                          DataCell(Text(e.regPageNo ?? '-')),
+                          if (isUseless)
+                            DataCell(Text(e.isDisabled ? 'Yes' : 'No')),
+                          if (isUseless)
+                            DataCell(Text(e.submittedToStoreDate ?? '-')),
+                          if (isUseless) DataCell(Text(e.transferDate ?? '-')),
+                          if (isUseless)
+                            DataCell(Text(e.transferredToScheme ?? '-')),
+                          if (isUseless)
+                            DataCell(Text(e.remarks ?? e.notes ?? '-')),
+                          DataCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.edit,
+                                    size: 18,
+                                    color: AppColors.primary,
+                                  ),
+                                  onPressed: () => _editEntry(e),
+                                  tooltip: 'Edit',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    size: 18,
+                                    color: AppColors.error,
+                                  ),
+                                  onPressed: () => _deleteEntry(e),
+                                  tooltip: 'Delete',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    .toList(),
               ),
             ),
           // Add Entry button at bottom
@@ -796,11 +970,16 @@ class _SpecRows extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filled = specs.entries.where((e) => e.value.trim().isNotEmpty).toList();
+    final filled = specs.entries
+        .where((e) => e.value.trim().isNotEmpty)
+        .toList();
     if (filled.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Text(emptyHint, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        child: Text(
+          emptyHint,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
       );
     }
     return Table(
@@ -843,23 +1022,36 @@ class _SpecTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filled = specs.entries.where((e) => e.value.trim().isNotEmpty).toList();
+    final filled = specs.entries
+        .where((e) => e.value.trim().isNotEmpty)
+        .toList();
     if (filled.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Text(emptyHint, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        child: Text(
+          emptyHint,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+        ),
       );
     }
     const cellPadding = EdgeInsets.symmetric(horizontal: 8, vertical: 6);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Table(
-        border: TableBorder.all(color: AppColors.textHint.withOpacity(0.4), width: 0.5),
+        border: TableBorder.all(
+          color: AppColors.textHint.withOpacity(0.4),
+          width: 0.5,
+        ),
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-        columnWidths: {for (int i = 0; i < filled.length; i++) i: const IntrinsicColumnWidth()},
+        columnWidths: {
+          for (int i = 0; i < filled.length; i++)
+            i: const IntrinsicColumnWidth(),
+        },
         children: [
           TableRow(
-            decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.05)),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.05),
+            ),
             children: [
               for (final e in filled)
                 Padding(

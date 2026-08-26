@@ -223,9 +223,9 @@ class _MiscellaneousScreenState extends State<MiscellaneousScreen> {
             filename: filePath.split(Platform.pathSeparator).last,
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Excel saved to: $filePath')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Excel saved to: $filePath')));
         }
       } else if (result == 'csv') {
         final filePath = await ExportService().exportMiscellaneousToCsv(
@@ -241,16 +241,16 @@ class _MiscellaneousScreenState extends State<MiscellaneousScreen> {
             filename: filePath.split(Platform.pathSeparator).last,
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('CSV saved to: $filePath')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('CSV saved to: $filePath')));
         }
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error exporting: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error exporting: $e')));
     }
   }
 
@@ -288,7 +288,7 @@ class _MiscellaneousScreenState extends State<MiscellaneousScreen> {
               DropdownButtonFormField<int>(
                 initialValue: selectedSchemeId,
                 decoration: const InputDecoration(
-                  labelText: 'Related Scheme (Optional)',
+                  labelText: 'Related Scheme *',
                 ),
                 items: _schemes
                     .map(
@@ -307,9 +307,7 @@ class _MiscellaneousScreenState extends State<MiscellaneousScreen> {
               DropdownButtonFormField<int>(
                 key: ValueKey(selectedSchemeId),
                 initialValue: selectedSetId,
-                decoration: const InputDecoration(
-                  labelText: 'Related Set (Optional)',
-                ),
+                decoration: const InputDecoration(labelText: 'Related Set *'),
                 items: (_setsBySchemeId[selectedSchemeId] ?? const <SetModel>[])
                     .map(
                       (set) => DropdownMenuItem<int>(
@@ -360,9 +358,13 @@ class _MiscellaneousScreenState extends State<MiscellaneousScreen> {
             ElevatedButton(
               onPressed: () {
                 final title = titleCtrl.text.trim();
-                if (title.isEmpty) {
+                if (title.isEmpty ||
+                    selectedSchemeId == null ||
+                    selectedSetId == null) {
                   setLocalState(
-                    () => validationError = 'Please enter an item title.',
+                    () => validationError = title.isEmpty
+                        ? 'Please enter an item title.'
+                        : 'Please select the related Scheme and Set.',
                   );
                   return;
                 }
@@ -435,10 +437,11 @@ class _MiscellaneousScreenState extends State<MiscellaneousScreen> {
     );
 
     if (confirmed != true) return;
+    final previousRecords = List<_MiscRecord>.from(_records);
     setState(() {
       _records.removeWhere((r) => r.id == record.id);
     });
-    await _persistRecords();
+    await _persistWithRollback(previousRecords);
   }
 
   Future<void> _openRecord(_MiscRecord record) async {
@@ -457,10 +460,11 @@ class _MiscellaneousScreenState extends State<MiscellaneousScreen> {
     final index = _records.indexWhere((r) => r.id == updated.id);
     if (index == -1) return;
 
+    final previousRecords = List<_MiscRecord>.from(_records);
     setState(() {
       _records[index] = updated;
     });
-    await _persistRecords();
+    await _persistWithRollback(previousRecords);
   }
 
   @override
@@ -884,8 +888,10 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
           await ExportService.saveHeaderText(headerText);
         }
 
-        final baseName = '${_record.title}_Report'
-            .replaceAll(RegExp(r'[^\w\s]'), '_');
+        final baseName = '${_record.title}_Report'.replaceAll(
+          RegExp(r'[^\w\s]'),
+          '_',
+        );
         final pdfName = '$baseName.pdf';
 
         if (Platform.isAndroid || Platform.isIOS) {
@@ -906,9 +912,9 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
             filename: filePath.split(Platform.pathSeparator).last,
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Excel saved to: $filePath')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Excel saved to: $filePath')));
         }
       } else if (result == 'csv') {
         final filePath = await ExportService().exportMiscellaneousToCsv(
@@ -923,16 +929,16 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
             filename: filePath.split(Platform.pathSeparator).last,
           );
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('CSV saved to: $filePath')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('CSV saved to: $filePath')));
         }
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error exporting: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error exporting: $e')));
     }
   }
 
@@ -976,11 +982,16 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.category_outlined, size: 18, color: Colors.blueGrey),
+                        const Icon(
+                          Icons.category_outlined,
+                          size: 18,
+                          color: Colors.blueGrey,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           _record.category,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
@@ -989,7 +1000,11 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.account_tree_outlined, size: 16, color: AppColors.primary),
+                        const Icon(
+                          Icons.account_tree_outlined,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
@@ -997,12 +1012,14 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
                             children: [
                               Text(
                                 'Scheme',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: AppColors.textSecondary),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 _record.schemeName ?? 'Unassigned Scheme',
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(fontWeight: FontWeight.w500),
                               ),
                             ],
                           ),
@@ -1012,7 +1029,11 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Icon(Icons.inventory_2_outlined, size: 16, color: AppColors.primary),
+                        const Icon(
+                          Icons.inventory_2_outlined,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
@@ -1020,12 +1041,14 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
                             children: [
                               Text(
                                 'Set',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: AppColors.textSecondary),
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 _record.setLabel ?? 'Unassigned Set',
-                                style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                                style: Theme.of(context).textTheme.bodyLarge
+                                    ?.copyWith(fontWeight: FontWeight.w500),
                               ),
                             ],
                           ),
@@ -1037,7 +1060,11 @@ class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.receipt_long_outlined, size: 16, color: AppColors.primary),
+                        const Icon(
+                          Icons.receipt_long_outlined,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 8),
                         Text(
                           'Expenditures: ${_record.entries.length}',

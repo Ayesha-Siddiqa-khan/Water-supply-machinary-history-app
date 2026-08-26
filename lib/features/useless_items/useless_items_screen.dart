@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
-import 'package:city_water_works_app/l10n/app_localizations.dart';
 
 import '../../core/database/daos/schemes_dao.dart';
 import '../../core/database/daos/sets_dao.dart';
@@ -33,8 +32,6 @@ class UselessItemsScreen extends StatefulWidget {
 
 class _UselessItemsScreenState extends State<UselessItemsScreen> {
   Future<void> _showExportOptions() async {
-    if (widget.schemeId == null) return;
-
     final result = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -43,24 +40,34 @@ class _UselessItemsScreenState extends State<UselessItemsScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.picture_as_pdf),
-              title: const Text('Export as PDF'),
-              subtitle: const Text('Professional A4 register for this scheme'),
+              title: Text(
+                widget.schemeId == null
+                    ? 'Print Complete Store Register'
+                    : 'Export as PDF',
+              ),
+              subtitle: Text(
+                widget.schemeId == null
+                    ? 'All damaged and unusable items in one register'
+                    : 'Professional A4 register for this record',
+              ),
               onTap: () => Navigator.pop(ctx, 'pdf'),
             ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.table_chart_outlined),
-              title: const Text('Export as Excel'),
-              subtitle: const Text('Spreadsheet format for data entry'),
-              onTap: () => Navigator.pop(ctx, 'excel'),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.code),
-              title: const Text('Export as CSV'),
-              subtitle: const Text('Plain text comma-separated values'),
-              onTap: () => Navigator.pop(ctx, 'csv'),
-            ),
+            if (widget.schemeId != null) ...[
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.table_chart_outlined),
+                title: const Text('Export as Excel'),
+                subtitle: const Text('Spreadsheet format for data entry'),
+                onTap: () => Navigator.pop(ctx, 'excel'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.code),
+                title: const Text('Export as CSV'),
+                subtitle: const Text('Plain text comma-separated values'),
+                onTap: () => Navigator.pop(ctx, 'csv'),
+              ),
+            ],
           ],
         ),
       ),
@@ -77,7 +84,41 @@ class _UselessItemsScreenState extends State<UselessItemsScreen> {
   }
 
   Future<void> _exportPdf() async {
-    if (widget.schemeId == null) return;
+    if (widget.schemeId == null) {
+      try {
+        final savedHeader = await ExportService.loadHeaderText();
+        final headerText = await ExportService.showHeaderEditDialog(
+          context,
+          currentHeader: savedHeader,
+        );
+        if (!mounted) return;
+        final effectiveHeader = (headerText != null && headerText.isNotEmpty)
+            ? headerText
+            : savedHeader;
+
+        final bytes = await ExportService().exportAllUselessItemsRegister(
+          headerText: effectiveHeader,
+        );
+        if (!mounted) return;
+
+        if (headerText != null && headerText.isNotEmpty) {
+          await ExportService.saveHeaderText(headerText);
+        }
+
+        const pdfName = 'Useless_Items_Store_Register.pdf';
+        if (Platform.isAndroid || Platform.isIOS) {
+          await Printing.sharePdf(bytes: bytes, filename: pdfName);
+        } else {
+          await Printing.layoutPdf(onLayout: (_) async => bytes, name: pdfName);
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error generating register: $e')),
+        );
+      }
+      return;
+    }
 
     final schemesDao = SchemesDao();
     final setsDao = SetsDao();
@@ -94,7 +135,9 @@ class _UselessItemsScreenState extends State<UselessItemsScreen> {
         currentHeader: savedHeader,
       );
       if (!mounted) return;
-      final effectiveHeader = (headerText != null && headerText.isNotEmpty) ? headerText : savedHeader;
+      final effectiveHeader = (headerText != null && headerText.isNotEmpty)
+          ? headerText
+          : savedHeader;
 
       final sets = await setsDao.getSetsForScheme(widget.schemeId!);
       final machineryBySetId = <int, List<Machinery>>{};
@@ -104,8 +147,8 @@ class _UselessItemsScreenState extends State<UselessItemsScreen> {
         final machineryList = await machineryDao.getMachineryForSet(set.setId!);
         machineryBySetId[set.setId!] = machineryList;
         for (final m in machineryList) {
-          entriesByMachineryId[m.machineryId!] =
-              await entriesDao.getEntriesForMachinery(m.machineryId!);
+          entriesByMachineryId[m.machineryId!] = await entriesDao
+              .getEntriesForMachinery(m.machineryId!);
         }
       }
 
@@ -123,8 +166,10 @@ class _UselessItemsScreenState extends State<UselessItemsScreen> {
         await ExportService.saveHeaderText(headerText);
       }
 
-      final baseName = '${scheme.schemeName}_Useless_Items_Register'
-          .replaceAll(RegExp(r'[^\w\s]'), '_');
+      final baseName = '${scheme.schemeName}_Useless_Items_Register'.replaceAll(
+        RegExp(r'[^\w\s]'),
+        '_',
+      );
       final pdfName = '$baseName.pdf';
 
       if (Platform.isAndroid || Platform.isIOS) {
@@ -134,9 +179,9 @@ class _UselessItemsScreenState extends State<UselessItemsScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error generating register: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error generating register: $e')));
     }
   }
 
@@ -156,15 +201,15 @@ class _UselessItemsScreenState extends State<UselessItemsScreen> {
           filename: filePath.split(Platform.pathSeparator).last,
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Excel saved to: $filePath')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Excel saved to: $filePath')));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error exporting: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error exporting: $e')));
     }
   }
 
@@ -184,40 +229,39 @@ class _UselessItemsScreenState extends State<UselessItemsScreen> {
           filename: filePath.split(Platform.pathSeparator).last,
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('CSV saved to: $filePath')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('CSV saved to: $filePath')));
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error exporting: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error exporting: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     return SchemesListScreen(
       title: widget.setLabel != null
           ? 'Useless Items — ${widget.setLabel}'
           : widget.schemeName == null
-          ? l10n.navUselessItems
+          ? 'Useless Items Store Register'
           : 'Useless Items — ${widget.schemeName}',
       schemeCategory: 'useless_item',
-      emptyStateTitle: l10n.uselessEmptyTitle,
-      emptyStateSubtitle: l10n.uselessEmptySubtitle,
-      addButtonLabel: l10n.uselessAddButton,
+      emptyStateTitle: 'No store records yet',
+      emptyStateSubtitle:
+          'Record damaged, unusable, or out-of-service equipment kept in the store.',
+      addButtonLabel: 'Add Store Record',
       parentSchemeId: widget.schemeId,
       parentSetId: widget.setId,
       appBarActions: [
-        if (widget.schemeId != null)
-          IconButton(
-            icon: const Icon(Icons.print_outlined),
-            onPressed: _showExportOptions,
-            tooltip: 'Print / Export',
-          ),
+        IconButton(
+          icon: const Icon(Icons.print_outlined),
+          onPressed: _showExportOptions,
+          tooltip: 'Print / Export Register',
+        ),
       ],
     );
   }
