@@ -26,7 +26,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-        version: 10,
+      version: 13,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: (db) async {
@@ -41,11 +41,21 @@ class AppDatabase {
         scheme_id INTEGER PRIMARY KEY AUTOINCREMENT,
         scheme_name TEXT NOT NULL,
         category TEXT NOT NULL DEFAULT 'scheme',
+        parent_scheme_id INTEGER,
+        parent_set_id INTEGER,
         description TEXT,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (parent_scheme_id) REFERENCES schemes (scheme_id) ON DELETE SET NULL,
+        FOREIGN KEY (parent_set_id) REFERENCES sets (set_id) ON DELETE CASCADE
       )
     ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_schemes_parent_scheme_id ON schemes(parent_scheme_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_schemes_parent_set_id ON schemes(parent_set_id)',
+    );
 
     await db.execute('''
       CREATE TABLE sets (
@@ -249,14 +259,24 @@ class AppDatabase {
     }
 
     if (oldVersion < 6) {
-      await db.execute("ALTER TABLE schemes ADD COLUMN category TEXT NOT NULL DEFAULT 'scheme'");
-      await db.execute("UPDATE schemes SET category = 'scheme' WHERE category IS NULL OR TRIM(category) = ''");
+      await db.execute(
+        "ALTER TABLE schemes ADD COLUMN category TEXT NOT NULL DEFAULT 'scheme'",
+      );
+      await db.execute(
+        "UPDATE schemes SET category = 'scheme' WHERE category IS NULL OR TRIM(category) = ''",
+      );
     }
 
     if (oldVersion < 7) {
-      await db.execute("ALTER TABLE billing_entries ADD COLUMN is_disabled INTEGER NOT NULL DEFAULT 0");
-      await db.execute("ALTER TABLE billing_entries ADD COLUMN submitted_to_store_date TEXT");
-      await db.execute("ALTER TABLE billing_entries ADD COLUMN transferred_to_scheme TEXT");
+      await db.execute(
+        "ALTER TABLE billing_entries ADD COLUMN is_disabled INTEGER NOT NULL DEFAULT 0",
+      );
+      await db.execute(
+        "ALTER TABLE billing_entries ADD COLUMN submitted_to_store_date TEXT",
+      );
+      await db.execute(
+        "ALTER TABLE billing_entries ADD COLUMN transferred_to_scheme TEXT",
+      );
       await db.execute("ALTER TABLE billing_entries ADD COLUMN remarks TEXT");
       await db.execute(
         "UPDATE billing_entries SET remarks = notes WHERE (remarks IS NULL OR TRIM(remarks) = '') AND notes IS NOT NULL AND TRIM(notes) <> ''",
@@ -264,7 +284,9 @@ class AppDatabase {
     }
 
     if (oldVersion < 8) {
-      await db.execute("ALTER TABLE billing_entries ADD COLUMN transfer_date TEXT");
+      await db.execute(
+        "ALTER TABLE billing_entries ADD COLUMN transfer_date TEXT",
+      );
     }
 
     if (oldVersion < 9) {
@@ -272,7 +294,88 @@ class AppDatabase {
     }
 
     if (oldVersion < 10) {
-      await db.execute("ALTER TABLE billing_entries ADD COLUMN work_order_no TEXT");
+      await db.execute(
+        "ALTER TABLE billing_entries ADD COLUMN work_order_no TEXT",
+      );
+    }
+
+    if (oldVersion < 11) {
+      await _addColumnIfMissing(db, 'schemes', 'parent_scheme_id', 'INTEGER');
+      await _addColumnIfMissing(
+        db,
+        'miscellaneous_items',
+        'scheme_id',
+        'INTEGER',
+      );
+      await _addColumnIfMissing(
+        db,
+        'miscellaneous_entries',
+        'work_order_no',
+        'TEXT',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_schemes_parent_scheme_id ON schemes(parent_scheme_id)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_miscellaneous_items_scheme_id ON miscellaneous_items(scheme_id)',
+      );
+    }
+
+    if (oldVersion < 12) {
+      await _addColumnIfMissing(db, 'schemes', 'parent_set_id', 'INTEGER');
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'set_id', 'INTEGER');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_schemes_parent_set_id ON schemes(parent_set_id)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_miscellaneous_items_set_id ON miscellaneous_items(set_id)',
+      );
+    }
+
+    // Repair databases that were already at version 12 before the scheme/set
+    // relationship columns were shipped. These checks are intentionally
+    // idempotent so partially upgraded databases can recover safely too.
+    if (oldVersion < 13) {
+      await _addColumnIfMissing(db, 'schemes', 'parent_scheme_id', 'INTEGER');
+      await _addColumnIfMissing(db, 'schemes', 'parent_set_id', 'INTEGER');
+      await _addColumnIfMissing(
+        db,
+        'miscellaneous_items',
+        'scheme_id',
+        'INTEGER',
+      );
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'set_id', 'INTEGER');
+      await _addColumnIfMissing(
+        db,
+        'miscellaneous_entries',
+        'work_order_no',
+        'TEXT',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_schemes_parent_scheme_id ON schemes(parent_scheme_id)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_schemes_parent_set_id ON schemes(parent_set_id)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_miscellaneous_items_scheme_id ON miscellaneous_items(scheme_id)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_miscellaneous_items_set_id ON miscellaneous_items(set_id)',
+      );
+    }
+  }
+
+  Future<void> _addColumnIfMissing(
+    Database db,
+    String table,
+    String column,
+    String definition,
+  ) async {
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    final exists = columns.any((row) => row['name'] == column);
+    if (!exists) {
+      await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
     }
   }
 
@@ -280,10 +383,14 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS miscellaneous_items (
         item_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        scheme_id INTEGER,
+        set_id INTEGER,
         title TEXT NOT NULL,
         category TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (scheme_id) REFERENCES schemes (scheme_id) ON DELETE CASCADE,
+        FOREIGN KEY (set_id) REFERENCES sets (set_id) ON DELETE CASCADE
       )
     ''');
 
@@ -293,6 +400,7 @@ class AppDatabase {
         item_id INTEGER NOT NULL,
         serial_no INTEGER NOT NULL,
         entry_date TEXT NOT NULL,
+        work_order_no TEXT,
         voucher_no TEXT,
         amount REAL NOT NULL,
         reg_page_no TEXT,
@@ -302,6 +410,13 @@ class AppDatabase {
         FOREIGN KEY (item_id) REFERENCES miscellaneous_items (item_id) ON DELETE CASCADE
       )
     ''');
+
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_miscellaneous_items_scheme_id ON miscellaneous_items(scheme_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_miscellaneous_items_set_id ON miscellaneous_items(set_id)',
+    );
   }
 
   Future<void> _migrateMiscFromSettings(Database db) async {

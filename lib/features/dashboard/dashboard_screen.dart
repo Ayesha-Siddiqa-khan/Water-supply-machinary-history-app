@@ -129,30 +129,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return rawType.trim().isEmpty ? 'Unknown' : rawType.trim();
   }
 
+  String _specValue(Map<String, String> specs, List<String> names) {
+    for (final name in names) {
+      final normalizedName = name.trim().toLowerCase();
+      for (final entry in specs.entries) {
+        if (entry.key.trim().toLowerCase() == normalizedName &&
+            entry.value.trim().isNotEmpty) {
+          return entry.value.trim();
+        }
+      }
+    }
+    return '';
+  }
+
+  String _fallbackSpecLabel(Machinery machinery, String unknownLabel) {
+    final label = machinery.displayLabel.trim();
+    final type = machinery.machineryType.trim().toLowerCase();
+    if (label.isNotEmpty && label.toLowerCase() != type) return label;
+    final brand = machinery.brand?.trim();
+    if (brand != null && brand.isNotEmpty) return brand;
+    if (label.isNotEmpty) return label;
+    return unknownLabel;
+  }
+
   String _extractSpecLabel(Machinery machinery) {
     final specs = machinery.specs;
     final type = _normalizeType(machinery.machineryType);
 
     if (type == 'Motor') {
-      final hp = specs['Horsepower'] ?? specs['HP'];
-      return hp?.trim().isNotEmpty == true ? hp!.trim() : 'Unknown HP';
+      final hp = _specValue(specs, ['Horsepower', 'HP', 'Rated Power (HP/kW)']);
+      return hp.isNotEmpty ? hp : _fallbackSpecLabel(machinery, 'Unknown HP');
     }
     if (type == 'Pump') {
-      final size = specs['Size'];
-      return size?.trim().isNotEmpty == true ? size!.trim() : 'Unknown Size';
+      final size = _specValue(specs, ['Size', 'Pump Size']);
+      return size.isNotEmpty ? size : _fallbackSpecLabel(machinery, 'Unknown Size');
     }
     if (type == 'Transformer') {
-      final kva = specs['kVA Rating'] ?? specs['KVA Rating'] ?? specs['kVA'] ?? specs['KV'];
-      if (kva?.trim().isNotEmpty == true) {
-        return kva!.trim().replaceAll(RegExp(r'kva', caseSensitive: false), 'Kv');
+      final kva = _specValue(specs, ['kVA Rating', 'KVA Rating', 'kVA', 'KV']);
+      if (kva.isNotEmpty) {
+        return kva.replaceAll(RegExp(r'kva', caseSensitive: false), 'Kv');
       }
-      return 'Unknown Kv';
+      return _fallbackSpecLabel(machinery, 'Unknown Kv');
     }
     if (type == 'Turbine') {
-      return 'Turbine';
+      final model = _specValue(specs, ['Model', 'Turbine Model']);
+      if (model.isNotEmpty) return model;
+      final flowRate = _specValue(specs, ['Flow Rate', 'Flow']);
+      if (flowRate.isNotEmpty) return 'Flow $flowRate';
+      return _fallbackSpecLabel(machinery, 'Turbine');
     }
 
-    return machinery.displayLabel.trim().isNotEmpty ? machinery.displayLabel.trim() : 'Unspecified';
+    return _fallbackSpecLabel(machinery, 'Unspecified');
   }
 
   List<String> _orderedTypeList() {
@@ -646,15 +673,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   spacing: 6,
                   runSpacing: 6,
                   children: sortedSpecs
-                      .take(4)
                       .map((spec) => Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.08),
+                              color: _typeColor(type).withOpacity(0.2),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text('$spec × ${specs[spec]}',
-                                style: TextStyle(color: _typeColor(type), fontSize: 10)),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                )),
                           ))
                       .toList(),
                 ),

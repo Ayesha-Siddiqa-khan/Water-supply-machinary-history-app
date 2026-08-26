@@ -19,6 +19,7 @@ import '../entries/billing_entry_form.dart';
 import '../entries/useless_entry_form.dart';
 import '../machinery/machinery_form.dart';
 import '../machinery/specs_editor_dialog.dart';
+import 'set_form.dart';
 import '../../core/services/export_service.dart';
 
 class SetDetailScreen extends StatefulWidget {
@@ -174,6 +175,24 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
     _loadData();
   }
 
+  Future<void> _editSet() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: SetForm(
+            schemeId: _set!.schemeId,
+            nextSetNumber: _set!.setNumber,
+            set: _set,
+          ),
+        ),
+      ),
+    );
+    if (result == true) _loadData();
+  }
+
   Future<void> _editMachinerySpecs(Machinery machinery) async {
     final fields = specFieldsFor(machinery.machineryType);
 
@@ -301,6 +320,11 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
         title: Text(_set?.setLabel ?? 'Set Detail'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: _editSet,
+            tooltip: 'Edit Set',
+          ),
+          IconButton(
             icon: const Icon(Icons.print_outlined),
             onPressed: _printReport,
             tooltip: 'Print Report',
@@ -359,8 +383,21 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                                 ? Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(_set!.setLabel,
-                                          style: Theme.of(context).textTheme.titleLarge),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              _set!.setLabel,
+                                              style: Theme.of(context).textTheme.titleLarge,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            onPressed: _editSet,
+                                            icon: const Icon(Icons.edit_outlined),
+                                            tooltip: 'Edit Set',
+                                          ),
+                                        ],
+                                      ),
                                       if (_scheme != null) ...[
                                         const SizedBox(height: 2),
                                         Text(
@@ -414,6 +451,11 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                                             ),
                                           ],
                                         ),
+                                       ),
+                                      IconButton(
+                                        onPressed: _editSet,
+                                        icon: const Icon(Icons.edit_outlined),
+                                        tooltip: 'Edit Set',
                                       ),
                                       Text(
                                         '${_machineryList.length} machinery',

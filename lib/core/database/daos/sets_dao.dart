@@ -6,7 +6,8 @@ class SetsDao {
 
   Future<List<SetModel>> getSetsForScheme(int schemeId) async {
     final db = await _db.database;
-    final result = await db.rawQuery('''
+    final result = await db.rawQuery(
+      '''
       SELECT st.*,
         (SELECT COUNT(*) FROM machinery WHERE machinery.set_id = st.set_id) as machinery_count,
         (SELECT COUNT(*) FROM billing_entries be
@@ -19,13 +20,16 @@ class SetsDao {
       FROM sets st
       WHERE st.scheme_id = ?
       ORDER BY st.set_number ASC
-    ''', [schemeId]);
+    ''',
+      [schemeId],
+    );
     return result.map((r) => SetModel.fromMap(r)).toList();
   }
 
   Future<SetModel?> getSetById(int id) async {
     final db = await _db.database;
-    final result = await db.rawQuery('''
+    final result = await db.rawQuery(
+      '''
       SELECT st.*,
         (SELECT COUNT(*) FROM machinery WHERE machinery.set_id = st.set_id) as machinery_count,
         (SELECT COUNT(*) FROM billing_entries be
@@ -37,7 +41,9 @@ class SetsDao {
          WHERE m.set_id = st.set_id) as total_amount
       FROM sets st
       WHERE st.set_id = ?
-    ''', [id]);
+    ''',
+      [id],
+    );
     if (result.isEmpty) return null;
     return SetModel.fromMap(result.first);
   }
@@ -59,7 +65,15 @@ class SetsDao {
 
   Future<void> deleteSet(int id) async {
     final db = await _db.database;
-    await db.delete('sets', where: 'set_id = ?', whereArgs: [id]);
+    await db.transaction((txn) async {
+      await txn.delete(
+        'miscellaneous_items',
+        where: 'set_id = ?',
+        whereArgs: [id],
+      );
+      await txn.delete('schemes', where: 'parent_set_id = ?', whereArgs: [id]);
+      await txn.delete('sets', where: 'set_id = ?', whereArgs: [id]);
+    });
   }
 
   Future<int> getSetCount() async {

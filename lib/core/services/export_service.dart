@@ -29,9 +29,13 @@ class ExportService {
 
   Future<void> _ensureFontsLoaded() async {
     if (_baseFont != null) return;
-    final regularData = await rootBundle.load('assets/fonts/NotoSans-Regular.ttf');
+    final regularData = await rootBundle.load(
+      'assets/fonts/NotoSans-Regular.ttf',
+    );
     final boldData = await rootBundle.load('assets/fonts/NotoSans-Bold.ttf');
-    final arabicData = await rootBundle.load('assets/fonts/NotoNaskhArabic-Regular.ttf');
+    final arabicData = await rootBundle.load(
+      'assets/fonts/NotoNaskhArabic-Regular.ttf',
+    );
     _baseFont = pw.Font.ttf(regularData);
     _boldFont = pw.Font.ttf(boldData);
     _arabicFont = pw.Font.ttf(arabicData);
@@ -39,11 +43,9 @@ class ExportService {
   }
 
   pw.ThemeData _pdfTheme() {
-    return pw.ThemeData.withFont(
-      base: _baseFont!,
-      bold: _boldFont!,
-    );
+    return pw.ThemeData.withFont(base: _baseFont!, bold: _boldFont!);
   }
+
   final MachineryDao _machineryDao = MachineryDao();
   final BillingEntriesDao _entriesDao = BillingEntriesDao();
   final MiscellaneousDao _miscDao = MiscellaneousDao();
@@ -80,9 +82,16 @@ class ExportService {
       return size?.trim().isNotEmpty == true ? size!.trim() : 'Unknown Size';
     }
     if (type == 'Transformer') {
-      final kv = specs['kVA Rating'] ?? specs['KVA Rating'] ?? specs['kVA'] ?? specs['KV'];
+      final kv =
+          specs['kVA Rating'] ??
+          specs['KVA Rating'] ??
+          specs['kVA'] ??
+          specs['KV'];
       if (kv?.trim().isNotEmpty == true) {
-        return kv!.trim().replaceAll(RegExp(r'kva', caseSensitive: false), 'Kv');
+        return kv!.trim().replaceAll(
+          RegExp(r'kva', caseSensitive: false),
+          'Kv',
+        );
       }
       return 'Unknown Kv';
     }
@@ -90,7 +99,9 @@ class ExportService {
       return 'Turbine';
     }
 
-    return machinery.displayLabel.trim().isNotEmpty ? machinery.displayLabel.trim() : 'Unspecified';
+    return machinery.displayLabel.trim().isNotEmpty
+        ? machinery.displayLabel.trim()
+        : 'Unspecified';
   }
 
   Future<Map<String, int>> _countSchemesByKeyTypes() async {
@@ -126,10 +137,7 @@ class ExportService {
       if (hasPump) schemesWithPump++;
     }
 
-    return {
-      'turbine': schemesWithTurbine,
-      'pump': schemesWithPump,
-    };
+    return {'turbine': schemesWithTurbine, 'pump': schemesWithPump};
   }
 
   Future<Uint8List> exportMachineryReportToPdf() async {
@@ -159,33 +167,51 @@ class ExportService {
     for (final type in preferred) {
       if (typeSet.contains(type)) orderedTypes.add(type);
     }
-    final others = typeSet.where((t) => !preferred.contains(t)).toList()..sort();
+    final others = typeSet.where((t) => !preferred.contains(t)).toList()
+      ..sort();
     orderedTypes.addAll(others);
 
-    final totalFunctional = functionalByType.values.fold<int>(0, (sum, v) => sum + v);
+    final totalFunctional = functionalByType.values.fold<int>(
+      0,
+      (sum, v) => sum + v,
+    );
     final totalMachinery = totalByType.values.fold<int>(0, (sum, v) => sum + v);
-    final grandTotalAmount = amountByType.values.fold<double>(0.0, (sum, v) => sum + v);
+    final grandTotalAmount = amountByType.values.fold<double>(
+      0.0,
+      (sum, v) => sum + v,
+    );
 
     final pdf = pw.Document(theme: _pdfTheme());
     final headerColor = PdfColor.fromHex('#1E3A5F');
 
     pdf.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
+        // The summary contains four wide KPI columns. Landscape keeps the
+        // type names and complete specification breakdown on one line.
+        pageFormat: PdfPageFormat.a4.landscape,
         footer: (context) => pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('Prepared by City Water Works',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
-            pw.Text('Page ${context.pageNumber} of ${context.pagesCount}',
-                style: const pw.TextStyle(fontSize: 8)),
+            pw.Text(
+              'Prepared by City Water Works',
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            ),
+            pw.Text(
+              'Page ${context.pageNumber} of ${context.pagesCount}',
+              style: const pw.TextStyle(fontSize: 8),
+            ),
           ],
         ),
         build: (context) => [
-          pw.Text('Machinery Report',
-              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'Machinery Report',
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+          ),
           pw.SizedBox(height: 4),
-          pw.Text('Generated on ${_nowFormatted()}', style: const pw.TextStyle(fontSize: 10)),
+          pw.Text(
+            'Generated on ${_nowFormatted()}',
+            style: const pw.TextStyle(fontSize: 10),
+          ),
           pw.SizedBox(height: 10),
           pw.Container(
             width: double.infinity,
@@ -199,12 +225,18 @@ class ExportService {
               children: [
                 pw.Text(
                   'Total Functional Machinery: $totalFunctional / $totalMachinery',
-                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
                 pw.SizedBox(height: 4),
                 pw.Text(
                   'Total Amount: ${_formatAmount(grandTotalAmount)}',
-                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
                 pw.SizedBox(height: 4),
                 pw.Text(
@@ -221,13 +253,30 @@ class ExportService {
           pw.SizedBox(height: 12),
           pw.TableHelper.fromTextArray(
             headerStyle: pw.TextStyle(
-                fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 10,
-                fontFallback: _fontFallback ?? []),
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+              fontSize: 10,
+              fontFallback: _fontFallback ?? [],
+            ),
             headerDecoration: pw.BoxDecoration(color: headerColor),
-            cellStyle: pw.TextStyle(fontSize: 9, fontFallback: _fontFallback ?? []),
-            cellAlignment: pw.Alignment.centerLeft,
-            headerAlignment: pw.Alignment.centerLeft,
-            headers: const ['Type', 'Functional / Total', 'Total Amount (PKR)', 'Specification Breakdown'],
+            cellStyle: pw.TextStyle(
+              fontSize: 8,
+              fontFallback: _fontFallback ?? [],
+            ),
+            columnWidths: {
+              0: pw.FixedColumnWidth(95),
+              1: pw.FixedColumnWidth(110),
+              2: pw.FixedColumnWidth(145),
+              3: pw.FlexColumnWidth(1),
+            },
+            cellAlignment: pw.Alignment.center,
+            headerAlignment: pw.Alignment.center,
+            headers: const [
+              'Type',
+              'Functional / Total',
+              'Total Amount (PKR)',
+              'Specification Breakdown',
+            ],
             data: orderedTypes.map((type) {
               final functional = functionalByType[type] ?? 0;
               final total = totalByType[type] ?? 0;
@@ -248,8 +297,13 @@ class ExportService {
           if (orderedTypes.isEmpty)
             pw.Padding(
               padding: const pw.EdgeInsets.only(top: 12),
-              child: pw.Text('No machinery data available.',
-                  style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+              child: pw.Text(
+                'No machinery data available.',
+                style: const pw.TextStyle(
+                  fontSize: 10,
+                  color: PdfColors.grey700,
+                ),
+              ),
             ),
         ],
       ),
@@ -260,27 +314,41 @@ class ExportService {
 
   // ─────────────────── PDF Export ───────────────────
 
-  Future<Uint8List> exportSetToPdf(int setId, {bool includeSpecs = false}) async {
+  Future<Uint8List> exportSetToPdf(
+    int setId, {
+    bool includeSpecs = false,
+  }) async {
     return _exportSetToPdfInternal(setId, includeSpecs: includeSpecs);
   }
 
-  Future<Uint8List> exportSingleMachineryToPdf(int setId, int machineryId) async {
+  Future<Uint8List> exportSingleMachineryToPdf(
+    int setId,
+    int machineryId,
+  ) async {
     final machineryList = await _machineryDao.getMachineryForSet(setId);
-    final selected = machineryList.where((m) => m.machineryId == machineryId).firstOrNull;
+    final selected = machineryList
+        .where((m) => m.machineryId == machineryId)
+        .firstOrNull;
     if (selected == null) {
       throw Exception('Selected machinery not found');
     }
     return _exportSetToPdfInternal(setId, machineryOverride: [selected]);
   }
 
-  Future<Uint8List> _exportSetToPdfInternal(int setId, {List<Machinery>? machineryOverride, bool includeSpecs = false}) async {
+  Future<Uint8List> _exportSetToPdfInternal(
+    int setId, {
+    List<Machinery>? machineryOverride,
+    bool includeSpecs = false,
+  }) async {
     await _ensureFontsLoaded();
     final setModel = await _setsDao.getSetById(setId);
     if (setModel == null) throw Exception('Set not found');
 
     final scheme = await _schemesDao.getSchemeById(setModel.schemeId);
-    final isUselessScheme = (scheme?.category ?? '').toLowerCase() == 'useless_item';
-    final machineryList = machineryOverride ?? await _machineryDao.getMachineryForSet(setId);
+    final isUselessScheme =
+        (scheme?.category ?? '').toLowerCase() == 'useless_item';
+    final machineryList =
+        machineryOverride ?? await _machineryDao.getMachineryForSet(setId);
     if (machineryList.isEmpty) {
       throw Exception('No machinery found in selected set');
     }
@@ -289,10 +357,11 @@ class ExportService {
     final entriesByMachinery = <int, List<dynamic>>{};
     int maxRows = 1;
     for (final machinery in machineryList) {
-      final machineryEntries = entries
-          .where((entry) => entry.machineryId == machinery.machineryId)
-          .toList()
-        ..sort((a, b) => a.serialNo.compareTo(b.serialNo));
+      final machineryEntries =
+          entries
+              .where((entry) => entry.machineryId == machinery.machineryId)
+              .toList()
+            ..sort((a, b) => a.serialNo.compareTo(b.serialNo));
       entriesByMachinery[machinery.machineryId!] = machineryEntries;
       if (machineryEntries.length > maxRows) {
         maxRows = machineryEntries.length;
@@ -310,6 +379,9 @@ class ExportService {
     }
 
     final pdf = pw.Document(theme: _pdfTheme());
+    final setInfo = setModel.details.entries
+        .where((e) => e.value.trim().isNotEmpty)
+        .toList();
 
     pdf.addPage(
       pw.MultiPage(
@@ -325,7 +397,10 @@ class ExportService {
             ),
             pw.SizedBox(height: 2),
             pw.Text(
-              _excelStyleSetHeading(scheme?.schemeName ?? 'Unknown Scheme', setModel.setLabel),
+              _excelStyleSetHeading(
+                scheme?.schemeName ?? 'Unknown Scheme',
+                setModel.setLabel,
+              ),
               textAlign: pw.TextAlign.left,
               style: const pw.TextStyle(fontSize: 10),
             ),
@@ -334,7 +409,10 @@ class ExportService {
               pw.Text(
                 'Useless Items Transfer Report',
                 textAlign: pw.TextAlign.left,
-                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
             ],
             pw.SizedBox(height: 10),
@@ -343,13 +421,21 @@ class ExportService {
         footer: (context) => pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('Prepared by City Water Works',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
-            pw.Text('Page ${context.pageNumber} of ${context.pagesCount}',
-                style: const pw.TextStyle(fontSize: 8)),
+            pw.Text(
+              'Prepared by City Water Works',
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            ),
+            pw.Text(
+              'Page ${context.pageNumber} of ${context.pagesCount}',
+              style: const pw.TextStyle(fontSize: 8),
+            ),
           ],
         ),
         build: (context) => [
+          if (setInfo.isNotEmpty) ...[
+            _compactSetInformation(setInfo),
+            pw.SizedBox(height: 6),
+          ],
           ...machineryBlocks.asMap().entries.expand((blockEntry) {
             final blockIndex = blockEntry.key;
             final block = blockEntry.value;
@@ -364,26 +450,45 @@ class ExportService {
               if (blockIndex > 0)
                 pw.Padding(
                   padding: const pw.EdgeInsets.only(bottom: 4),
-                  child: pw.Text('Continued',
-                      style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                  child: pw.Text(
+                    'Continued',
+                    style: pw.TextStyle(
+                      fontSize: 9,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
                 ),
               if (includeSpecs)
                 ...block.expand((machinery) {
-                  final specs = machinery.specs.entries.where((e) => e.value.trim().isNotEmpty).toList();
+                  final specs = machinery.specs.entries
+                      .where((e) => e.value.trim().isNotEmpty)
+                      .toList();
                   if (specs.isEmpty) return <pw.Widget>[];
                   return [
                     pw.Container(
                       width: double.infinity,
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                      decoration: pw.BoxDecoration(color: PdfColor.fromHex('#E8EDF2')),
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColors.grey200,
+                      ),
                       child: pw.Column(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                          pw.Text(_machineryHeaderLabel(machinery),
-                              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+                          pw.Text(
+                            _machineryHeaderLabel(machinery),
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 8,
+                            ),
+                          ),
                           pw.SizedBox(height: 2),
                           pw.Text(
-                            specs.map((e) => '${e.key}: ${e.value}').join(' | '),
+                            specs
+                                .map((e) => '${e.key}: ${e.value}')
+                                .join(' | '),
                             style: const pw.TextStyle(fontSize: 7),
                           ),
                         ],
@@ -408,46 +513,150 @@ class ExportService {
               ),
               pw.Row(
                 children: [
-                  _pdfCell('Sr.No', width: colWidth, bold: true, align: pw.TextAlign.center),
-                  ...block.expand((_) => isUselessScheme
-                      ? [
-                          _pdfCell('Reg. Page No.', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Disabled/Closed', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Submitted To Store', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Transfer Date', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Transferred To Scheme', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Remarks', width: colWidth, bold: true, align: pw.TextAlign.center),
-                        ]
-                      : [
-                          _pdfCell('Date', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Work Order No.', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Voucher No.', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Amount', width: colWidth, bold: true, align: pw.TextAlign.center),
-                        ]),
+                  _pdfCell(
+                    'Sr.No',
+                    width: colWidth,
+                    bold: true,
+                    align: pw.TextAlign.center,
+                  ),
+                  ...block.expand(
+                    (_) => isUselessScheme
+                        ? [
+                            _pdfCell(
+                              'Reg. Page No.',
+                              width: colWidth,
+                              bold: true,
+                              align: pw.TextAlign.center,
+                            ),
+                            _pdfCell(
+                              'Disabled/Closed',
+                              width: colWidth,
+                              bold: true,
+                              align: pw.TextAlign.center,
+                            ),
+                            _pdfCell(
+                              'Submitted To Store',
+                              width: colWidth,
+                              bold: true,
+                              align: pw.TextAlign.center,
+                            ),
+                            _pdfCell(
+                              'Transfer Date',
+                              width: colWidth,
+                              bold: true,
+                              align: pw.TextAlign.center,
+                            ),
+                            _pdfCell(
+                              'Transferred To Scheme',
+                              width: colWidth,
+                              bold: true,
+                              align: pw.TextAlign.center,
+                            ),
+                            _pdfCell(
+                              'Remarks',
+                              width: colWidth,
+                              bold: true,
+                              align: pw.TextAlign.center,
+                            ),
+                          ]
+                        : [
+                            _pdfCell(
+                              'Date',
+                              width: colWidth,
+                              bold: true,
+                              align: pw.TextAlign.center,
+                            ),
+                            _pdfCell(
+                              'W.O. No.',
+                              width: colWidth,
+                              bold: true,
+                              align: pw.TextAlign.center,
+                            ),
+                            _pdfCell(
+                              'Voucher No.',
+                              width: colWidth,
+                              bold: true,
+                              align: pw.TextAlign.center,
+                            ),
+                            _pdfCell(
+                              'Amount',
+                              width: colWidth,
+                              bold: true,
+                              align: pw.TextAlign.center,
+                            ),
+                          ],
+                  ),
                 ],
               ),
               ...List.generate(maxRows, (rowIndex) {
                 return pw.Row(
                   children: [
-                    _pdfCell('${rowIndex + 1}', width: colWidth, align: pw.TextAlign.center),
+                    _pdfCell(
+                      '${rowIndex + 1}',
+                      width: colWidth,
+                      align: pw.TextAlign.center,
+                    ),
                     ...block.expand((machinery) {
-                      final mEntries = entriesByMachinery[machinery.machineryId!] ?? [];
-                      final entry = rowIndex < mEntries.length ? mEntries[rowIndex] : null;
+                      final mEntries =
+                          entriesByMachinery[machinery.machineryId!] ?? [];
+                      final entry = rowIndex < mEntries.length
+                          ? mEntries[rowIndex]
+                          : null;
                       if (isUselessScheme) {
                         return [
-                          _pdfCell(entry?.regPageNo ?? '-', width: colWidth, align: pw.TextAlign.center),
-                          _pdfCell((entry?.isDisabled ?? false) ? 'Yes' : '-', width: colWidth, align: pw.TextAlign.center),
-                          _pdfCell(entry?.submittedToStoreDate ?? '-', width: colWidth, align: pw.TextAlign.center),
-                          _pdfCell(entry?.transferDate ?? '-', width: colWidth, align: pw.TextAlign.center),
-                          _pdfCell(entry?.transferredToScheme ?? '-', width: colWidth, align: pw.TextAlign.center),
-                          _pdfCell(entry?.remarks ?? entry?.notes ?? '-', width: colWidth, align: pw.TextAlign.center),
+                          _pdfCell(
+                            entry?.regPageNo ?? '-',
+                            width: colWidth,
+                            align: pw.TextAlign.center,
+                          ),
+                          _pdfCell(
+                            (entry?.isDisabled ?? false) ? 'Yes' : '-',
+                            width: colWidth,
+                            align: pw.TextAlign.center,
+                          ),
+                          _pdfCell(
+                            entry?.submittedToStoreDate ?? '-',
+                            width: colWidth,
+                            align: pw.TextAlign.center,
+                          ),
+                          _pdfCell(
+                            entry?.transferDate ?? '-',
+                            width: colWidth,
+                            align: pw.TextAlign.center,
+                          ),
+                          _pdfCell(
+                            entry?.transferredToScheme ?? '-',
+                            width: colWidth,
+                            align: pw.TextAlign.center,
+                          ),
+                          _pdfCell(
+                            entry?.remarks ?? entry?.notes ?? '-',
+                            width: colWidth,
+                            align: pw.TextAlign.center,
+                          ),
                         ];
                       }
                       return [
-                        _pdfCell(entry?.entryDate ?? '-', width: colWidth, align: pw.TextAlign.center),
-                        _pdfCell(entry?.workOrderNo ?? '-', width: colWidth, align: pw.TextAlign.center),
-                        _pdfCell(entry?.voucherNo?.toString() ?? '-', width: colWidth, align: pw.TextAlign.center),
-                        _pdfCell(entry != null ? _formatAmount(entry.amount) : '-', width: colWidth, align: pw.TextAlign.center),
+                        _pdfCell(
+                          entry?.entryDate ?? '-',
+                          width: colWidth,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          entry?.workOrderNo ?? '-',
+                          width: colWidth,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          entry?.voucherNo?.toString() ?? '-',
+                          width: colWidth,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          entry != null ? _formatAmount(entry.amount) : '-',
+                          width: colWidth,
+                          align: pw.TextAlign.center,
+                        ),
                       ];
                     }),
                   ],
@@ -487,7 +696,8 @@ class ExportService {
     }
 
     final computed = parts.join(' ').trim();
-    if (computed.toLowerCase() == type.toLowerCase() && machinery.displayLabel.trim().isNotEmpty) {
+    if (computed.toLowerCase() == type.toLowerCase() &&
+        machinery.displayLabel.trim().isNotEmpty) {
       return machinery.displayLabel.trim();
     }
     return computed;
@@ -497,6 +707,59 @@ class ExportService {
     final normalizedSet = setLabel.replaceFirst('Set No. ', 'Set No.');
     return '$schemeName $normalizedSet';
   }
+
+  pw.Widget _compactSetInformation(
+    List<MapEntry<String, String>> entries,
+  ) {
+    String compactLabel(String label) {
+      switch (label.trim().toLowerCase()) {
+        case 'location / gps coordinates':
+          return 'Location / GPS';
+        case 'electricity bill reference no.':
+          return 'Bill Ref. No.';
+        case 'electricity distribution company':
+          return 'Company';
+        default:
+          return label;
+      }
+    }
+
+    final details = entries
+        .map((entry) => '${compactLabel(entry.key)}: ${entry.value}')
+        .join(' | ');
+
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+      decoration: pw.BoxDecoration(color: PdfColors.grey200),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Text(
+            'Set Information',
+            style: pw.TextStyle(
+              color: PdfColors.black,
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 9,
+              fontFallback: _fontFallback ?? [],
+            ),
+          ),
+          pw.SizedBox(width: 10),
+          pw.Expanded(
+            child: pw.Text(
+              details,
+              style: pw.TextStyle(
+                color: PdfColors.black,
+                fontSize: 7.5,
+                fontFallback: _fontFallback ?? [],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   pw.Widget _pdfCell(
     String text, {
     required double width,
@@ -547,114 +810,145 @@ class ExportService {
     final headerStyle = pw.TextStyle(
       fontSize: 8,
       fontWeight: pw.FontWeight.bold,
-      color: PdfColors.white,
+      color: PdfColors.black,
       fontFallback: _fontFallback ?? [],
     );
-    final cellStyle = pw.TextStyle(fontSize: 8, fontFallback: _fontFallback ?? []);
-    final tableBorder = pw.TableBorder.all(color: PdfColors.grey600, width: 0.5);
+    final cellStyle = pw.TextStyle(
+      fontSize: 8,
+      fontFallback: _fontFallback ?? [],
+    );
+    final tableBorder = pw.TableBorder.all(
+      color: PdfColors.grey600,
+      width: 0.5,
+    );
 
     pw.Widget sectionTable(List<String> headers, List<List<String>> rows) {
       return pw.TableHelper.fromTextArray(
         headers: headers,
         data: rows,
         headerStyle: headerStyle,
-        headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#1E3A5F')),
-        headerAlignment: pw.Alignment.topLeft,
+        headerDecoration: pw.BoxDecoration(color: PdfColors.grey300),
+        headerAlignment: pw.Alignment.center,
         cellStyle: cellStyle,
-        cellAlignment: pw.Alignment.topLeft,
+        cellAlignment: pw.Alignment.center,
         cellPadding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         border: tableBorder,
       );
     }
 
     final content = <pw.Widget>[
-      pw.Text('Water Supply Scheme History',
-          textAlign: pw.TextAlign.center,
-          style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+      pw.Text(
+        'Water Supply Scheme History',
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+      ),
       pw.SizedBox(height: 2),
-      pw.Text('$schemeName - ${set.setLabel}',
-          textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 12)),
+      pw.Text(
+        '$schemeName - ${set.setLabel}',
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(fontSize: 12),
+      ),
       pw.SizedBox(height: 2),
-      pw.Text('Total: ${_formatAmount(set.totalAmount)} | Printed on ${_nowFormatted()}',
-          textAlign: pw.TextAlign.center,
-          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+      pw.Text(
+        'Total: ${_formatAmount(set.totalAmount)} | Printed on ${_nowFormatted()}',
+        textAlign: pw.TextAlign.center,
+        style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+      ),
       pw.SizedBox(height: 8),
     ];
 
-    final setInfo = set.details.entries.where((e) => e.value.trim().isNotEmpty).toList();
+    final setInfo = set.details.entries
+        .where((e) => e.value.trim().isNotEmpty)
+        .toList();
     if (setInfo.isNotEmpty) {
-      content.add(sectionTable(
-        const ['Set Information', 'Details'],
-        [for (final e in setInfo) [e.key, e.value]],
-      ));
-      content.add(pw.SizedBox(height: 10));
+      content.add(_compactSetInformation(setInfo));
+      content.add(pw.SizedBox(height: 6));
     }
 
     for (final machinery in machineryList) {
       final entries = entriesByMachineryId[machinery.machineryId] ?? const [];
       final total = entries.fold<double>(0, (s, e) => s + e.amount);
 
-      content.add(pw.Container(
-        width: double.infinity,
-        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-        decoration: pw.BoxDecoration(color: PdfColor.fromHex('#1E3A5F')),
-        child: pw.Text(
-          '${machinery.displayLabel} (${machinery.machineryType}) | ${entries.length} entries | Total: ${_formatAmount(total)}',
-          style: pw.TextStyle(
-              color: PdfColors.white, fontWeight: pw.FontWeight.bold, fontSize: 10),
+      content.add(
+        pw.Container(
+          width: double.infinity,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+          decoration: pw.BoxDecoration(color: PdfColors.grey300),
+          child: pw.Text(
+            '${machinery.displayLabel} (${machinery.machineryType}) | ${entries.length} entries | Total: ${_formatAmount(total)}',
+            style: pw.TextStyle(
+              color: PdfColors.black,
+              fontWeight: pw.FontWeight.bold,
+              fontSize: 10,
+            ),
+          ),
         ),
-      ));
+      );
       content.add(pw.SizedBox(height: 4));
 
       if (includeSpecs) {
-        final specs = machinery.specs.entries.where((e) => e.value.trim().isNotEmpty).toList();
+        final specs = machinery.specs.entries
+            .where((e) => e.value.trim().isNotEmpty)
+            .toList();
         if (specs.isNotEmpty) {
-          content.add(sectionTable(
-            [for (final e in specs) e.key],
-            [[for (final e in specs) e.value]],
-          ));
+          content.add(
+            sectionTable(
+              [for (final e in specs) e.key],
+              [
+                [for (final e in specs) e.value],
+              ],
+            ),
+          );
           content.add(pw.SizedBox(height: 6));
         }
       }
 
       if (entries.isEmpty) {
-        content.add(pw.Padding(
-          padding: const pw.EdgeInsets.symmetric(vertical: 4),
-          child: pw.Text('No billing entries yet.',
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600)),
-        ));
+        content.add(
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 4),
+            child: pw.Text(
+              'No billing entries yet.',
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+            ),
+          ),
+        );
       } else {
-        content.add(sectionTable(
-          const ['Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount (PKR)', 'Reg. Page No.'],
-          [
-            for (final e in entries)
-              [
-                '${e.serialNo}',
-                e.entryDate,
-                e.workOrderNo ?? '-',
-                e.voucherNo?.toString() ?? '-',
-                _formatAmount(e.amount),
-                e.regPageNo ?? '-',
-              ],
-            [
-              'Total',
-              '',
-              '',
-              '',
-              _formatAmount(total),
-              '',
+        content.add(
+          sectionTable(
+            const [
+              'Sr.No',
+              'Date',
+              'W.O. No.',
+              'Voucher No.',
+              'Amount (PKR)',
+              'Reg. Page No.',
             ],
-          ],
-        ));
+            [
+              for (final e in entries)
+                [
+                  '${e.serialNo}',
+                  e.entryDate,
+                  e.workOrderNo ?? '-',
+                  e.voucherNo?.toString() ?? '-',
+                  _formatAmount(e.amount),
+                  e.regPageNo ?? '-',
+                ],
+              ['Total', '', '', '', _formatAmount(total), ''],
+            ],
+          ),
+        );
       }
       content.add(pw.SizedBox(height: 12));
     }
 
-    pdf.addPage(pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(18),
-      build: (context) => content,
-    ));
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(18),
+        build: (context) => content,
+      ),
+    );
 
     return pdf.save();
   }
@@ -675,7 +969,9 @@ class ExportService {
 
     final masterTemplates = <_MachineryTemplate>[];
     if (sets.isNotEmpty) {
-      final firstSetMachinery = await _machineryDao.getMachineryForSet(sets.first.setId!);
+      final firstSetMachinery = await _machineryDao.getMachineryForSet(
+        sets.first.setId!,
+      );
       for (final machinery in firstSetMachinery) {
         masterTemplates.add(
           _MachineryTemplate(
@@ -688,7 +984,9 @@ class ExportService {
 
     final sectionWidgets = <pw.Widget>[];
     for (final setModel in sets) {
-      final machineryList = await _machineryDao.getMachineryForSet(setModel.setId!);
+      final machineryList = await _machineryDao.getMachineryForSet(
+        setModel.setId!,
+      );
       final entries = await _entriesDao.getEntriesForSet(setModel.setId!);
 
       final actualTypes = machineryList
@@ -706,7 +1004,8 @@ class ExportService {
         if (hasPump && templateType == 'turbine') continue;
 
         final idx = remainingMachinery.indexWhere(
-            (m) => _normalizeType(m.machineryType).toLowerCase() == templateType);
+          (m) => _normalizeType(m.machineryType).toLowerCase() == templateType,
+        );
 
         if (idx >= 0) {
           effectiveMachineryList.add(remainingMachinery.removeAt(idx));
@@ -747,10 +1046,11 @@ class ExportService {
       final entriesByMachinery = <int, List<dynamic>>{};
       int maxRows = 1;
       for (final machinery in effectiveMachineryList) {
-        final machineryEntries = entries
-            .where((entry) => entry.machineryId == machinery.machineryId)
-            .toList()
-          ..sort((a, b) => a.serialNo.compareTo(b.serialNo));
+        final machineryEntries =
+            entries
+                .where((entry) => entry.machineryId == machinery.machineryId)
+                .toList()
+              ..sort((a, b) => a.serialNo.compareTo(b.serialNo));
         entriesByMachinery[machinery.machineryId!] = machineryEntries;
         if (machineryEntries.length > maxRows) {
           maxRows = machineryEntries.length;
@@ -760,7 +1060,11 @@ class ExportService {
 
       const maxMachineryPerBlock = 3;
       final machineryBlocks = <List<Machinery>>[];
-      for (int i = 0; i < effectiveMachineryList.length; i += maxMachineryPerBlock) {
+      for (
+        int i = 0;
+        i < effectiveMachineryList.length;
+        i += maxMachineryPerBlock
+      ) {
         final end = (i + maxMachineryPerBlock) > effectiveMachineryList.length
             ? effectiveMachineryList.length
             : (i + maxMachineryPerBlock);
@@ -787,7 +1091,9 @@ class ExportService {
       sectionWidgets.add(pw.SizedBox(height: 4));
 
       if (effectiveMachineryList.isEmpty) {
-        sectionWidgets.add(pw.Text('No machinery data', style: pw.TextStyle(fontSize: 9)));
+        sectionWidgets.add(
+          pw.Text('No machinery data', style: pw.TextStyle(fontSize: 9)),
+        );
         sectionWidgets.add(pw.SizedBox(height: 10));
         continue;
       }
@@ -802,7 +1108,9 @@ class ExportService {
           return pw.Padding(
             padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             child: pw.Directionality(
-              textDirection: isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+              textDirection: isRtl
+                  ? pw.TextDirection.rtl
+                  : pw.TextDirection.ltr,
               child: pw.Align(
                 alignment: pw.Alignment.center,
                 child: pw.Text(
@@ -813,7 +1121,9 @@ class ExportService {
                     font: isRtl ? _arabicFont : (bold ? _boldFont : _baseFont),
                     fontBold: _boldFont,
                     fontFallback: _fontFallback ?? [],
-                    fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                    fontWeight: bold
+                        ? pw.FontWeight.bold
+                        : pw.FontWeight.normal,
                   ),
                 ),
               ),
@@ -821,7 +1131,11 @@ class ExportService {
           );
         }
 
-        for (int machineIndex = 0; machineIndex < effectiveMachineryList.length; machineIndex++) {
+        for (
+          int machineIndex = 0;
+          machineIndex < effectiveMachineryList.length;
+          machineIndex++
+        ) {
           final machinery = effectiveMachineryList[machineIndex];
           final mEntries = entriesByMachinery[machinery.machineryId!] ?? [];
           final rowCount = math.max(mEntries.length, 1);
@@ -850,7 +1164,9 @@ class ExportService {
           ];
 
           for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-            final entry = rowIndex < mEntries.length ? mEntries[rowIndex] : null;
+            final entry = rowIndex < mEntries.length
+                ? mEntries[rowIndex]
+                : null;
             tableRows.add(
               pw.TableRow(
                 children: [
@@ -869,7 +1185,8 @@ class ExportService {
           sectionWidgets.add(
             pw.Table(
               columnWidths: {
-                for (int i = 0; i < dataColCount; i++) i: pw.FixedColumnWidth(uselessColWidth),
+                for (int i = 0; i < dataColCount; i++)
+                  i: pw.FixedColumnWidth(uselessColWidth),
               },
               border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
               children: tableRows,
@@ -885,7 +1202,11 @@ class ExportService {
         continue;
       }
 
-      for (int blockIndex = 0; blockIndex < machineryBlocks.length; blockIndex++) {
+      for (
+        int blockIndex = 0;
+        blockIndex < machineryBlocks.length;
+        blockIndex++
+      ) {
         final block = machineryBlocks[blockIndex];
         final tableWidth = PdfPageFormat.a4.landscape.width - 36;
         final perMachineryCols = isUselessScheme ? 6 : 3;
@@ -896,8 +1217,10 @@ class ExportService {
 
         if (blockIndex > 0) {
           sectionWidgets.add(
-            pw.Text('${setModel.setLabel} (continued)',
-                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              '${setModel.setLabel} (continued)',
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+            ),
           );
           sectionWidgets.add(pw.SizedBox(height: 3));
         }
@@ -910,9 +1233,14 @@ class ExportService {
           pw.Widget _tableCell(String text, {bool bold = false}) {
             final isRtl = _containsArabic(text);
             return pw.Padding(
-              padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              padding: const pw.EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 6,
+              ),
               child: pw.Directionality(
-                textDirection: isRtl ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+                textDirection: isRtl
+                    ? pw.TextDirection.rtl
+                    : pw.TextDirection.ltr,
                 child: pw.Align(
                   alignment: pw.Alignment.center,
                   child: pw.Text(
@@ -920,7 +1248,9 @@ class ExportService {
                     textAlign: pw.TextAlign.center,
                     style: pw.TextStyle(
                       fontSize: 9,
-                      fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+                      fontWeight: bold
+                          ? pw.FontWeight.bold
+                          : pw.FontWeight.normal,
                     ),
                   ),
                 ),
@@ -928,33 +1258,37 @@ class ExportService {
             );
           }
 
-          sectionWidgets.add(pw.Row(
-            children: [
-              ...block.asMap().entries.map((entry) {
-                final index = entry.key;
-                final machinery = entry.value;
-                return _pdfCell(
-                  _machineryHeaderLabel(machinery),
-                  width: index == 0 ? firstHeaderWidth : otherHeaderWidth,
-                  bold: true,
-                  align: pw.TextAlign.center,
-                );
-              }),
-            ],
-          ));
+          sectionWidgets.add(
+            pw.Row(
+              children: [
+                ...block.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final machinery = entry.value;
+                  return _pdfCell(
+                    _machineryHeaderLabel(machinery),
+                    width: index == 0 ? firstHeaderWidth : otherHeaderWidth,
+                    bold: true,
+                    align: pw.TextAlign.center,
+                  );
+                }),
+              ],
+            ),
+          );
 
           final tableRows = <pw.TableRow>[
             pw.TableRow(
               children: [
                 _tableCell('Sr.No', bold: true),
-                ...block.expand((_) => [
-                      _tableCell('Reg. Page No.', bold: true),
-                      _tableCell('Disabled/Closed', bold: true),
-                      _tableCell('Submitted To Store', bold: true),
-                      _tableCell('Transfer Date', bold: true),
-                      _tableCell('Transferred To Scheme', bold: true),
-                      _tableCell('Remarks', bold: true),
-                    ]),
+                ...block.expand(
+                  (_) => [
+                    _tableCell('Reg. Page No.', bold: true),
+                    _tableCell('Disabled/Closed', bold: true),
+                    _tableCell('Submitted To Store', bold: true),
+                    _tableCell('Transfer Date', bold: true),
+                    _tableCell('Transferred To Scheme', bold: true),
+                    _tableCell('Remarks', bold: true),
+                  ],
+                ),
               ],
             ),
           ];
@@ -965,8 +1299,11 @@ class ExportService {
                 children: [
                   _tableCell('${rowIndex + 1}'),
                   ...block.expand((machinery) {
-                    final mEntries = entriesByMachinery[machinery.machineryId!] ?? [];
-                    final entry = rowIndex < mEntries.length ? mEntries[rowIndex] : null;
+                    final mEntries =
+                        entriesByMachinery[machinery.machineryId!] ?? [];
+                    final entry = rowIndex < mEntries.length
+                        ? mEntries[rowIndex]
+                        : null;
                     return [
                       _tableCell(entry?.regPageNo ?? '-'),
                       _tableCell((entry?.isDisabled ?? false) ? 'Yes' : '-'),
@@ -984,7 +1321,8 @@ class ExportService {
           sectionWidgets.add(
             pw.Table(
               columnWidths: {
-                for (int i = 0; i < dataColCount; i++) i: pw.FixedColumnWidth(uselessColWidth),
+                for (int i = 0; i < dataColCount; i++)
+                  i: pw.FixedColumnWidth(uselessColWidth),
               },
               border: pw.TableBorder.all(color: PdfColors.grey600, width: 0.5),
               children: tableRows,
@@ -1013,22 +1351,79 @@ class ExportService {
         sectionWidgets.add(
           pw.Row(
             children: [
-              _pdfCell('Sr.No', width: colWidth, bold: true, align: pw.TextAlign.center),
-              ...block.expand((_) => isUselessScheme
-                  ? [
-                      _pdfCell('Reg. Page No.', width: colWidth, bold: true, align: pw.TextAlign.center),
-                      _pdfCell('Disabled/Closed', width: colWidth, bold: true, align: pw.TextAlign.center),
-                      _pdfCell('Submitted To Store', width: colWidth, bold: true, align: pw.TextAlign.center),
-                      _pdfCell('Transfer Date', width: colWidth, bold: true, align: pw.TextAlign.center),
-                      _pdfCell('Transferred To Scheme', width: colWidth, bold: true, align: pw.TextAlign.center),
-                      _pdfCell('Remarks', width: colWidth, bold: true, align: pw.TextAlign.center),
-                    ]
-                  : [
-                      _pdfCell('Date', width: colWidth, bold: true, align: pw.TextAlign.center),
-                      _pdfCell('Work Order No.', width: colWidth, bold: true, align: pw.TextAlign.center),
-                      _pdfCell('Voucher No.', width: colWidth, bold: true, align: pw.TextAlign.center),
-                      _pdfCell('Amount', width: colWidth, bold: true, align: pw.TextAlign.center),
-                    ]),
+              _pdfCell(
+                'Sr.No',
+                width: colWidth,
+                bold: true,
+                align: pw.TextAlign.center,
+              ),
+              ...block.expand(
+                (_) => isUselessScheme
+                    ? [
+                        _pdfCell(
+                          'Reg. Page No.',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Disabled/Closed',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Submitted To Store',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Transfer Date',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Transferred To Scheme',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Remarks',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                      ]
+                    : [
+                        _pdfCell(
+                          'Date',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Work Order No.',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Voucher No.',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Amount',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                      ],
+              ),
             ],
           ),
         );
@@ -1037,28 +1432,72 @@ class ExportService {
           sectionWidgets.add(
             pw.Row(
               children: [
-                _pdfCell('${rowIndex + 1}', width: colWidth, align: pw.TextAlign.center),
+                _pdfCell(
+                  '${rowIndex + 1}',
+                  width: colWidth,
+                  align: pw.TextAlign.center,
+                ),
                 ...block.expand((machinery) {
-                  final mEntries = entriesByMachinery[machinery.machineryId!] ?? [];
-                  final entry = rowIndex < mEntries.length ? mEntries[rowIndex] : null;
+                  final mEntries =
+                      entriesByMachinery[machinery.machineryId!] ?? [];
+                  final entry = rowIndex < mEntries.length
+                      ? mEntries[rowIndex]
+                      : null;
                   if (isUselessScheme) {
                     return [
-                      _pdfCell(entry?.regPageNo ?? '-', width: colWidth, align: pw.TextAlign.center),
-                      _pdfCell((entry?.isDisabled ?? false) ? 'Yes' : '-', width: colWidth, align: pw.TextAlign.center),
-                      _pdfCell(entry?.submittedToStoreDate ?? '-', width: colWidth, align: pw.TextAlign.center),
-                      _pdfCell(entry?.transferDate ?? '-', width: colWidth, align: pw.TextAlign.center),
-                      _pdfCell(entry?.transferredToScheme ?? '-', width: colWidth, align: pw.TextAlign.center),
-                      _pdfCell(entry?.remarks ?? entry?.notes ?? '-', width: colWidth, align: pw.TextAlign.center),
+                      _pdfCell(
+                        entry?.regPageNo ?? '-',
+                        width: colWidth,
+                        align: pw.TextAlign.center,
+                      ),
+                      _pdfCell(
+                        (entry?.isDisabled ?? false) ? 'Yes' : '-',
+                        width: colWidth,
+                        align: pw.TextAlign.center,
+                      ),
+                      _pdfCell(
+                        entry?.submittedToStoreDate ?? '-',
+                        width: colWidth,
+                        align: pw.TextAlign.center,
+                      ),
+                      _pdfCell(
+                        entry?.transferDate ?? '-',
+                        width: colWidth,
+                        align: pw.TextAlign.center,
+                      ),
+                      _pdfCell(
+                        entry?.transferredToScheme ?? '-',
+                        width: colWidth,
+                        align: pw.TextAlign.center,
+                      ),
+                      _pdfCell(
+                        entry?.remarks ?? entry?.notes ?? '-',
+                        width: colWidth,
+                        align: pw.TextAlign.center,
+                      ),
                     ];
                   }
                   return [
-                    _pdfCell(entry?.entryDate ?? '-', width: colWidth, align: pw.TextAlign.center),
-                    _pdfCell(entry?.workOrderNo ?? '-', width: colWidth, align: pw.TextAlign.center),
-                    _pdfCell(entry?.voucherNo?.toString() ?? '-', width: colWidth, align: pw.TextAlign.center),
                     _pdfCell(
-                        entry != null ? _formatAmount(entry.amount) : '-',
-                        width: colWidth,
-                        align: pw.TextAlign.center),
+                      entry?.entryDate ?? '-',
+                      width: colWidth,
+                      align: pw.TextAlign.center,
+                    ),
+                    _pdfCell(
+                      entry?.workOrderNo ?? '-',
+                      width: colWidth,
+                      align: pw.TextAlign.center,
+                    ),
+                    _pdfCell(
+                      entry?.voucherNo?.toString() ?? '-',
+                      width: colWidth,
+                      align: pw.TextAlign.center,
+                    ),
+                    _pdfCell(
+                      entry != null ? _formatAmount(entry.amount) : '-',
+                      width: colWidth,
+                      align: pw.TextAlign.center,
+                    ),
                   ];
                 }),
               ],
@@ -1089,10 +1528,15 @@ class ExportService {
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(
-                  isUselessScheme ? 'Useless Items Transfer Summary' : 'Scheme Summary Report',
+                  isUselessScheme
+                      ? 'Useless Items Transfer Summary'
+                      : 'Scheme Summary Report',
                   style: const pw.TextStyle(fontSize: 10),
                 ),
-                pw.Text('Date: ${_nowFormatted()}', style: const pw.TextStyle(fontSize: 10)),
+                pw.Text(
+                  'Date: ${_nowFormatted()}',
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
               ],
             ),
             pw.SizedBox(height: 6),
@@ -1102,10 +1546,14 @@ class ExportService {
         footer: (context) => pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('Prepared by City Water Works',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
-            pw.Text('Page ${context.pageNumber} of ${context.pagesCount}',
-                style: const pw.TextStyle(fontSize: 8)),
+            pw.Text(
+              'Prepared by City Water Works',
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            ),
+            pw.Text(
+              'Page ${context.pageNumber} of ${context.pagesCount}',
+              style: const pw.TextStyle(fontSize: 8),
+            ),
           ],
         ),
         build: (context) => sectionWidgets,
@@ -1115,7 +1563,9 @@ class ExportService {
     return pdf.save();
   }
 
-  Future<Uint8List> exportAllMachineryToPdf() async {
+  Future<Uint8List> exportAllMachineryToPdf({
+    bool includeSpecs = false,
+  }) async {
     await _ensureFontsLoaded();
     final schemes = await _schemesDao.getAllSchemes();
     final schemeTypeCounts = await _countSchemesByKeyTypes();
@@ -1142,7 +1592,10 @@ class ExportService {
               pw.Text(
                 'Water Supply Scheme History - Complete Machinery Export',
                 textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                ),
               ),
               pw.SizedBox(height: 4),
               pw.Text(
@@ -1150,7 +1603,11 @@ class ExportService {
                 textAlign: pw.TextAlign.center,
                 style: const pw.TextStyle(fontSize: 10),
               ),
-              pw.Text('Date: ${_nowFormatted()}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 10)),
+              pw.Text(
+                'Date: ${_nowFormatted()}',
+                textAlign: pw.TextAlign.center,
+                style: const pw.TextStyle(fontSize: 10),
+              ),
               pw.SizedBox(height: 6),
               pw.Divider(thickness: 1),
             ],
@@ -1158,16 +1615,26 @@ class ExportService {
           footer: (context) => pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text('Prepared by City Water Works',
-                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
-              pw.Text('Page ${context.pageNumber} of ${context.pagesCount}',
-                  style: const pw.TextStyle(fontSize: 8)),
+              pw.Text(
+                'Prepared by City Water Works',
+                style: const pw.TextStyle(
+                  fontSize: 8,
+                  color: PdfColors.grey600,
+                ),
+              ),
+              pw.Text(
+                'Page ${context.pageNumber} of ${context.pagesCount}',
+                style: const pw.TextStyle(fontSize: 8),
+              ),
             ],
           ),
           build: (context) => [
             pw.Padding(
               padding: const pw.EdgeInsets.only(top: 24),
-              child: pw.Text('No schemes found.', style: const pw.TextStyle(fontSize: 11)),
+              child: pw.Text(
+                'No schemes found.',
+                style: const pw.TextStyle(fontSize: 11),
+              ),
             ),
           ],
         ),
@@ -1197,7 +1664,10 @@ class ExportService {
           final type = _normalizeType(machinery.machineryType);
           final spec = _extractSpecLabel(machinery);
           totalByType[type] = (totalByType[type] ?? 0) + 1;
-          final typeMap = summaryByType.putIfAbsent(type, () => <String, int>{});
+          final typeMap = summaryByType.putIfAbsent(
+            type,
+            () => <String, int>{},
+          );
           typeMap[spec] = (typeMap[spec] ?? 0) + 1;
           schemeTotalMachinery++;
         }
@@ -1213,7 +1683,8 @@ class ExportService {
       for (final type in preferred) {
         if (presentTypes.contains(type)) orderedTypes.add(type);
       }
-      final others = presentTypes.where((t) => !preferred.contains(t)).toList()..sort();
+      final others = presentTypes.where((t) => !preferred.contains(t)).toList()
+        ..sort();
       orderedTypes.addAll(others);
 
       for (final type in orderedTypes) {
@@ -1241,10 +1712,15 @@ class ExportService {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: schemeSummaryLines
-                  .map((line) => pw.Padding(
-                        padding: const pw.EdgeInsets.only(bottom: 2),
-                        child: pw.Text(line, style: const pw.TextStyle(fontSize: 9)),
-                      ))
+                  .map(
+                    (line) => pw.Padding(
+                      padding: const pw.EdgeInsets.only(bottom: 2),
+                      child: pw.Text(
+                        line,
+                        style: const pw.TextStyle(fontSize: 9),
+                      ),
+                    ),
+                  )
                   .toList(),
             ),
           ),
@@ -1262,7 +1738,10 @@ class ExportService {
                 pw.Text(
                   'Water Supply Scheme History - Complete Machinery Export',
                   textAlign: pw.TextAlign.center,
-                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
                 pw.SizedBox(height: 4),
                 if (schemeIndex == 0 && context.pageNumber == 1)
@@ -1271,8 +1750,16 @@ class ExportService {
                     textAlign: pw.TextAlign.center,
                     style: const pw.TextStyle(fontSize: 10),
                   ),
-                pw.Text('Scheme: ${scheme.schemeName}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 10)),
-                pw.Text('Date: ${_nowFormatted()}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 10)),
+                pw.Text(
+                  'Scheme: ${scheme.schemeName}',
+                  textAlign: pw.TextAlign.center,
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
+                pw.Text(
+                  'Date: ${_nowFormatted()}',
+                  textAlign: pw.TextAlign.center,
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
                 pw.SizedBox(height: 6),
                 pw.Divider(thickness: 1),
               ],
@@ -1280,10 +1767,17 @@ class ExportService {
             footer: (context) => pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('Prepared by City Water Works',
-                    style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
-                pw.Text('Page ${context.pageNumber} of ${context.pagesCount}',
-                    style: const pw.TextStyle(fontSize: 8)),
+                pw.Text(
+                  'Prepared by City Water Works',
+                  style: const pw.TextStyle(
+                    fontSize: 8,
+                    color: PdfColors.grey600,
+                  ),
+                ),
+                pw.Text(
+                  'Page ${context.pageNumber} of ${context.pagesCount}',
+                  style: const pw.TextStyle(fontSize: 8),
+                ),
               ],
             ),
             build: (context) => emptyWidgets,
@@ -1300,8 +1794,8 @@ class ExportService {
         final entries = await _entriesDao.getEntriesForSet(setId);
 
         final setWidgets = <pw.Widget>[];
-        const rowsPerPageWithSummary = 18;
-        const rowsPerPage = 22;
+        final rowsPerPageWithSummary = includeSpecs ? 10 : 18;
+        final rowsPerPage = includeSpecs ? 14 : 22;
         bool firstSetPage = true;
 
         void addSchemeSummaryBlock() {
@@ -1322,10 +1816,15 @@ class ExportService {
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: schemeSummaryLines
-                    .map((line) => pw.Padding(
-                          padding: const pw.EdgeInsets.only(bottom: 2),
-                          child: pw.Text(line, style: const pw.TextStyle(fontSize: 9)),
-                        ))
+                    .map(
+                      (line) => pw.Padding(
+                        padding: const pw.EdgeInsets.only(bottom: 2),
+                        child: pw.Text(
+                          line,
+                          style: const pw.TextStyle(fontSize: 9),
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ),
@@ -1334,7 +1833,9 @@ class ExportService {
         }
 
         void addSetHeader({required bool continued}) {
-          final label = continued ? '${setModel.setLabel} (continued)' : setModel.setLabel;
+          final label = continued
+              ? '${setModel.setLabel} (continued)'
+              : setModel.setLabel;
           setWidgets.add(
             pw.Text(
               label,
@@ -1355,16 +1856,24 @@ class ExportService {
             addSchemeSummaryBlock();
           }
           addSetHeader(continued: false);
-          setWidgets.add(pw.Text('No machinery data', style: const pw.TextStyle(fontSize: 9)));
+          setWidgets.add(
+            pw.Text(
+              'No machinery data',
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+          );
           setWidgets.add(pw.SizedBox(height: 10));
         } else {
           final entriesByMachinery = <int, List<dynamic>>{};
           int maxRows = 1;
           for (final machinery in machineryList) {
-            final machineryEntries = entries
-                .where((entry) => entry.machineryId == machinery.machineryId)
-                .toList()
-              ..sort((a, b) => a.serialNo.compareTo(b.serialNo));
+            final machineryEntries =
+                entries
+                    .where(
+                      (entry) => entry.machineryId == machinery.machineryId,
+                    )
+                    .toList()
+                  ..sort((a, b) => a.serialNo.compareTo(b.serialNo));
             entriesByMachinery[machinery.machineryId!] = machineryEntries;
             if (machineryEntries.length > maxRows) {
               maxRows = machineryEntries.length;
@@ -1381,18 +1890,28 @@ class ExportService {
             machineryBlocks.add(machineryList.sublist(i, end));
           }
 
-          for (int blockIndex = 0; blockIndex < machineryBlocks.length; blockIndex++) {
+          for (
+            int blockIndex = 0;
+            blockIndex < machineryBlocks.length;
+            blockIndex++
+          ) {
             final block = machineryBlocks[blockIndex];
             final tableWidth = PdfPageFormat.a4.landscape.width - 36;
-            final totalCols = 1 + (block.length * 3);
+            final totalCols = 1 + (block.length * 4);
             final colWidth = tableWidth / totalCols;
-            final firstHeaderWidth = colWidth * 4;
-            final otherHeaderWidth = colWidth * 3;
+            final firstHeaderWidth = colWidth * 5;
+            final otherHeaderWidth = colWidth * 4;
 
-            for (int start = 0; start < maxRows; start +=
-                ((setIndex == 0 && firstSetPage) ? rowsPerPageWithSummary : rowsPerPage)) {
-              final chunkSize =
-                  (setIndex == 0 && firstSetPage) ? rowsPerPageWithSummary : rowsPerPage;
+            for (
+              int start = 0;
+              start < maxRows;
+              start += ((setIndex == 0 && firstSetPage)
+                  ? rowsPerPageWithSummary
+                  : rowsPerPage)
+            ) {
+              final chunkSize = (setIndex == 0 && firstSetPage)
+                  ? rowsPerPageWithSummary
+                  : rowsPerPage;
               final end = math.min(start + chunkSize, maxRows);
 
               if (!firstSetPage) {
@@ -1405,6 +1924,50 @@ class ExportService {
 
               final isContinued = !(blockIndex == 0 && start == 0);
               addSetHeader(continued: isContinued);
+
+              if (includeSpecs && start == 0) {
+                for (final machinery in block) {
+                  final specs = machinery.specs.entries
+                      .where((entry) => entry.value.trim().isNotEmpty)
+                      .toList();
+                  if (specs.isEmpty) continue;
+
+                  setWidgets.add(
+                    pw.Container(
+                      width: double.infinity,
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
+                      decoration: pw.BoxDecoration(color: PdfColors.grey200),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            _machineryHeaderLabel(machinery),
+                            style: pw.TextStyle(
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: 8,
+                            ),
+                          ),
+                          pw.SizedBox(height: 2),
+                          pw.Text(
+                            specs
+                                .map(
+                                  (entry) =>
+                                      '${entry.key}: ${entry.value}',
+                                )
+                                .join(' | '),
+                            style: const pw.TextStyle(fontSize: 7),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                  setWidgets.add(pw.SizedBox(height: 2));
+                }
+                setWidgets.add(pw.SizedBox(height: 2));
+              }
 
               setWidgets.add(
                 pw.Row(
@@ -1425,13 +1988,40 @@ class ExportService {
               setWidgets.add(
                 pw.Row(
                   children: [
-                    _pdfCell('Sr.No', width: colWidth, bold: true, align: pw.TextAlign.center),
-                    ...block.expand((_) => [
-                          _pdfCell('Date', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Work Order No.', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Voucher No.', width: colWidth, bold: true, align: pw.TextAlign.center),
-                          _pdfCell('Amount', width: colWidth, bold: true, align: pw.TextAlign.center),
-                        ]),
+                    _pdfCell(
+                      'Sr.No',
+                      width: colWidth,
+                      bold: true,
+                      align: pw.TextAlign.center,
+                    ),
+                    ...block.expand(
+                      (_) => [
+                        _pdfCell(
+                          'Date',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Work Order No.',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Voucher No.',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                        _pdfCell(
+                          'Amount',
+                          width: colWidth,
+                          bold: true,
+                          align: pw.TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               );
@@ -1440,15 +2030,38 @@ class ExportService {
                 setWidgets.add(
                   pw.Row(
                     children: [
-                      _pdfCell('${rowIndex + 1}', width: colWidth, align: pw.TextAlign.center),
+                      _pdfCell(
+                        '${rowIndex + 1}',
+                        width: colWidth,
+                        align: pw.TextAlign.center,
+                      ),
                       ...block.expand((machinery) {
-                        final mEntries = entriesByMachinery[machinery.machineryId!] ?? [];
-                        final entry = rowIndex < mEntries.length ? mEntries[rowIndex] : null;
+                        final mEntries =
+                            entriesByMachinery[machinery.machineryId!] ?? [];
+                        final entry = rowIndex < mEntries.length
+                            ? mEntries[rowIndex]
+                            : null;
                         return [
-                          _pdfCell(entry?.entryDate ?? '-', width: colWidth, align: pw.TextAlign.center),
-                          _pdfCell(entry?.workOrderNo ?? '-', width: colWidth, align: pw.TextAlign.center),
-                          _pdfCell(entry?.voucherNo?.toString() ?? '-', width: colWidth, align: pw.TextAlign.center),
-                          _pdfCell(entry != null ? _formatAmount(entry.amount) : '-', width: colWidth, align: pw.TextAlign.center),
+                          _pdfCell(
+                            entry?.entryDate ?? '-',
+                            width: colWidth,
+                            align: pw.TextAlign.center,
+                          ),
+                          _pdfCell(
+                            entry?.workOrderNo ?? '-',
+                            width: colWidth,
+                            align: pw.TextAlign.center,
+                          ),
+                          _pdfCell(
+                            entry?.voucherNo?.toString() ?? '-',
+                            width: colWidth,
+                            align: pw.TextAlign.center,
+                          ),
+                          _pdfCell(
+                            entry != null ? _formatAmount(entry.amount) : '-',
+                            width: colWidth,
+                            align: pw.TextAlign.center,
+                          ),
                         ];
                       }),
                     ],
@@ -1462,43 +2075,63 @@ class ExportService {
           }
         }
 
-      pdf.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4.landscape,
-          margin: const pw.EdgeInsets.all(18),
-          header: (context) => pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-            children: [
-              pw.Text(
-                'Water Supply Scheme History - Complete Machinery Export',
-                textAlign: pw.TextAlign.center,
-                style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-              ),
-              pw.SizedBox(height: 4),
-              if (schemeIndex == 0 && setIndex == 0 && context.pageNumber == 1)
+        pdf.addPage(
+          pw.MultiPage(
+            pageFormat: PdfPageFormat.a4.landscape,
+            margin: const pw.EdgeInsets.all(18),
+            header: (context) => pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
                 pw.Text(
-                  'Total Machinery: Motor $motorCount | Pump $pumpCount | Transformer $transformerCount | Turbine $turbineCount',
+                  'Water Supply Scheme History - Complete Machinery Export',
+                  textAlign: pw.TextAlign.center,
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                if (schemeIndex == 0 &&
+                    setIndex == 0 &&
+                    context.pageNumber == 1)
+                  pw.Text(
+                    'Total Machinery: Motor $motorCount | Pump $pumpCount | Transformer $transformerCount | Turbine $turbineCount',
+                    textAlign: pw.TextAlign.center,
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
+                pw.Text(
+                  'Scheme: ${scheme.schemeName}',
                   textAlign: pw.TextAlign.center,
                   style: const pw.TextStyle(fontSize: 10),
                 ),
-              pw.Text('Scheme: ${scheme.schemeName}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 10)),
-              pw.Text('Date: ${_nowFormatted()}', textAlign: pw.TextAlign.center, style: const pw.TextStyle(fontSize: 10)),
-              pw.SizedBox(height: 6),
-              pw.Divider(thickness: 1),
-            ],
+                pw.Text(
+                  'Date: ${_nowFormatted()}',
+                  textAlign: pw.TextAlign.center,
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
+                pw.SizedBox(height: 6),
+                pw.Divider(thickness: 1),
+              ],
+            ),
+            footer: (context) => pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text(
+                  'Prepared by City Water Works',
+                  style: const pw.TextStyle(
+                    fontSize: 8,
+                    color: PdfColors.grey600,
+                  ),
+                ),
+                pw.Text(
+                  'Page ${context.pageNumber} of ${context.pagesCount}',
+                  style: const pw.TextStyle(fontSize: 8),
+                ),
+              ],
+            ),
+            build: (context) => setWidgets,
           ),
-          footer: (context) => pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Prepared by City Water Works',
-                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
-              pw.Text('Page ${context.pageNumber} of ${context.pagesCount}',
-                  style: const pw.TextStyle(fontSize: 8)),
-            ],
-          ),
-          build: (context) => setWidgets,
-        ),
-      );
+        );
       }
     }
 
@@ -1537,17 +2170,32 @@ class ExportService {
 
     int colOffset = 0;
     for (final setModel in sets) {
-      final machineryList = await _machineryDao.getMachineryForSet(setModel.setId!);
+      final machineryList = await _machineryDao.getMachineryForSet(
+        setModel.setId!,
+      );
 
       // Row 0: Set header
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: colOffset, rowIndex: 0)).value =
-          xl.TextCellValue('${scheme.schemeName} ${setModel.setLabel}');
+      sheet
+          .cell(
+            xl.CellIndex.indexByColumnRow(columnIndex: colOffset, rowIndex: 0),
+          )
+          .value = xl.TextCellValue(
+        '${scheme.schemeName} ${setModel.setLabel}',
+      );
 
       int machColOffset = colOffset;
       for (final machinery in machineryList) {
         // Row 1: Machinery label
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset, rowIndex: 1)).value =
-            xl.TextCellValue(machinery.displayLabel);
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(
+                columnIndex: machColOffset,
+                rowIndex: 1,
+              ),
+            )
+            .value = xl.TextCellValue(
+          machinery.displayLabel,
+        );
 
         final headers = isUselessScheme
             ? [
@@ -1560,10 +2208,21 @@ class ExportService {
                 'Transferred To Scheme',
                 'Remarks',
               ]
-            : ['Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount', 'Reg. Page No.'];
+            : [
+                'Sr.No',
+                'Date',
+                'Work Order No.',
+                'Voucher No.',
+                'Amount',
+                'Reg. Page No.',
+              ];
         for (int h = 0; h < headers.length; h++) {
-          final cell = sheet.cell(xl.CellIndex.indexByColumnRow(
-              columnIndex: machColOffset + h, rowIndex: 2));
+          final cell = sheet.cell(
+            xl.CellIndex.indexByColumnRow(
+              columnIndex: machColOffset + h,
+              rowIndex: 2,
+            ),
+          );
           cell.value = xl.TextCellValue(headers[h]);
           cell.cellStyle = xl.CellStyle(
             bold: true,
@@ -1573,39 +2232,153 @@ class ExportService {
         }
 
         // Data rows
-        final entries = await _entriesDao.getEntriesForMachinery(machinery.machineryId!);
+        final entries = await _entriesDao.getEntriesForMachinery(
+          machinery.machineryId!,
+        );
         for (int i = 0; i < entries.length; i++) {
           final e = entries[i];
           if (isUselessScheme) {
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset, rowIndex: 3 + i)).value =
-            xl.IntCellValue(e.serialNo);
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 1, rowIndex: 3 + i)).value =
-            xl.TextCellValue(e.entryDate);
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 2, rowIndex: 3 + i)).value =
-            xl.TextCellValue(e.regPageNo ?? '');
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 3, rowIndex: 3 + i)).value =
-            xl.TextCellValue(e.isDisabled ? 'Yes' : 'No');
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 4, rowIndex: 3 + i)).value =
-            xl.TextCellValue(e.submittedToStoreDate ?? '');
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 5, rowIndex: 3 + i)).value =
-            xl.TextCellValue(e.transferDate ?? '');
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 6, rowIndex: 3 + i)).value =
-            xl.TextCellValue(e.transferredToScheme ?? '');
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 7, rowIndex: 3 + i)).value =
-            xl.TextCellValue(e.remarks ?? e.notes ?? '');
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.IntCellValue(
+              e.serialNo,
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 1,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.TextCellValue(
+              e.entryDate,
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 2,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.TextCellValue(
+              e.regPageNo ?? '',
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 3,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.TextCellValue(
+              e.isDisabled ? 'Yes' : 'No',
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 4,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.TextCellValue(
+              e.submittedToStoreDate ?? '',
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 5,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.TextCellValue(
+              e.transferDate ?? '',
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 6,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.TextCellValue(
+              e.transferredToScheme ?? '',
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 7,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.TextCellValue(
+              e.remarks ?? e.notes ?? '',
+            );
           } else {
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset, rowIndex: 3 + i)).value =
-            xl.IntCellValue(e.serialNo);
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 1, rowIndex: 3 + i)).value =
-            xl.TextCellValue(e.entryDate);
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 2, rowIndex: 3 + i)).value =
-            xl.TextCellValue(e.workOrderNo ?? '');
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 3, rowIndex: 3 + i)).value =
-            e.voucherNo != null ? xl.IntCellValue(e.voucherNo!) : xl.TextCellValue('');
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 4, rowIndex: 3 + i)).value =
-            xl.DoubleCellValue(e.amount);
-          sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 5, rowIndex: 3 + i)).value =
-            xl.TextCellValue(e.regPageNo ?? '');
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.IntCellValue(
+              e.serialNo,
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 1,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.TextCellValue(
+              e.entryDate,
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 2,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.TextCellValue(
+              e.workOrderNo ?? '',
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 3,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = e.voucherNo != null
+                ? xl.IntCellValue(e.voucherNo!)
+                : xl.TextCellValue('');
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 4,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.DoubleCellValue(
+              e.amount,
+            );
+            sheet
+                .cell(
+                  xl.CellIndex.indexByColumnRow(
+                    columnIndex: machColOffset + 5,
+                    rowIndex: 3 + i,
+                  ),
+                )
+                .value = xl.TextCellValue(
+              e.regPageNo ?? '',
+            );
           }
         }
 
@@ -1620,7 +2393,8 @@ class ExportService {
     }
 
     final dir = await getApplicationDocumentsDirectory();
-    final filename = '${scheme.schemeName.replaceAll(RegExp(r'[^\w\s]'), '_')}_Export.xlsx';
+    final filename =
+        '${scheme.schemeName.replaceAll(RegExp(r'[^\w\s]'), '_')}_Export.xlsx';
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(excel.encode()!);
     return file.path;
@@ -1631,20 +2405,39 @@ class ExportService {
     if (setModel == null) throw Exception('Set not found');
 
     final scheme = await _schemesDao.getSchemeById(setModel.schemeId);
-    final isUselessScheme = (scheme?.category ?? '').toLowerCase() == 'useless_item';
+    final isUselessScheme =
+        (scheme?.category ?? '').toLowerCase() == 'useless_item';
     final excel = xl.Excel.createExcel();
     final baseName = '${scheme?.schemeName ?? 'Scheme'} ${setModel.setLabel}';
-    final sheetName = baseName.length > 31 ? baseName.substring(0, 31) : baseName;
+    final sheetName = baseName.length > 31
+        ? baseName.substring(0, 31)
+        : baseName;
     final sheet = excel[sheetName];
 
     final machineryList = await _machineryDao.getMachineryForSet(setId);
     int machColOffset = 0;
     for (final machinery in machineryList) {
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset, rowIndex: 0)).value =
-          xl.TextCellValue(baseName);
+      sheet
+          .cell(
+            xl.CellIndex.indexByColumnRow(
+              columnIndex: machColOffset,
+              rowIndex: 0,
+            ),
+          )
+          .value = xl.TextCellValue(
+        baseName,
+      );
 
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset, rowIndex: 1)).value =
-          xl.TextCellValue(machinery.displayLabel);
+      sheet
+          .cell(
+            xl.CellIndex.indexByColumnRow(
+              columnIndex: machColOffset,
+              rowIndex: 1,
+            ),
+          )
+          .value = xl.TextCellValue(
+        machinery.displayLabel,
+      );
 
       final headers = isUselessScheme
           ? [
@@ -1657,10 +2450,21 @@ class ExportService {
               'Transferred To Scheme',
               'Remarks',
             ]
-          : ['Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount', 'Reg. Page No.'];
+          : [
+              'Sr.No',
+              'Date',
+              'Work Order No.',
+              'Voucher No.',
+              'Amount',
+              'Reg. Page No.',
+            ];
       for (int h = 0; h < headers.length; h++) {
-        final cell =
-            sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + h, rowIndex: 2));
+        final cell = sheet.cell(
+          xl.CellIndex.indexByColumnRow(
+            columnIndex: machColOffset + h,
+            rowIndex: 2,
+          ),
+        );
         cell.value = xl.TextCellValue(headers[h]);
         cell.cellStyle = xl.CellStyle(
           bold: true,
@@ -1669,57 +2473,157 @@ class ExportService {
         );
       }
 
-      final entries = await _entriesDao.getEntriesForMachinery(machinery.machineryId!);
+      final entries = await _entriesDao.getEntriesForMachinery(
+        machinery.machineryId!,
+      );
       for (int i = 0; i < entries.length; i++) {
         final e = entries[i];
         if (isUselessScheme) {
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset, rowIndex: 3 + i))
-            .value = xl.IntCellValue(e.serialNo);
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.IntCellValue(
+            e.serialNo,
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 1, rowIndex: 3 + i))
-            .value = xl.TextCellValue(e.entryDate);
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 1,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.TextCellValue(
+            e.entryDate,
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 2, rowIndex: 3 + i))
-            .value = xl.TextCellValue(e.regPageNo ?? '');
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 2,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.TextCellValue(
+            e.regPageNo ?? '',
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 3, rowIndex: 3 + i))
-            .value = xl.TextCellValue(e.isDisabled ? 'Yes' : 'No');
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 3,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.TextCellValue(
+            e.isDisabled ? 'Yes' : 'No',
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 4, rowIndex: 3 + i))
-            .value = xl.TextCellValue(e.submittedToStoreDate ?? '');
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 4,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.TextCellValue(
+            e.submittedToStoreDate ?? '',
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 5, rowIndex: 3 + i))
-            .value = xl.TextCellValue(e.transferDate ?? '');
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 5,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.TextCellValue(
+            e.transferDate ?? '',
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 6, rowIndex: 3 + i))
-            .value = xl.TextCellValue(e.transferredToScheme ?? '');
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 6,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.TextCellValue(
+            e.transferredToScheme ?? '',
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 7, rowIndex: 3 + i))
-            .value = xl.TextCellValue(e.remarks ?? e.notes ?? '');
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 7,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.TextCellValue(
+            e.remarks ?? e.notes ?? '',
+          );
         } else {
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset, rowIndex: 3 + i))
-            .value = xl.IntCellValue(e.serialNo);
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.IntCellValue(
+            e.serialNo,
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 1, rowIndex: 3 + i))
-            .value = xl.TextCellValue(e.entryDate);
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 1,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.TextCellValue(
+            e.entryDate,
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 2, rowIndex: 3 + i))
-            .value = xl.TextCellValue(e.workOrderNo ?? '');
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 2,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.TextCellValue(
+            e.workOrderNo ?? '',
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 3, rowIndex: 3 + i))
-            .value = e.voucherNo != null ? xl.IntCellValue(e.voucherNo!) : xl.TextCellValue('');
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 3,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = e.voucherNo != null
+              ? xl.IntCellValue(e.voucherNo!)
+              : xl.TextCellValue('');
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 4, rowIndex: 3 + i))
-            .value = xl.DoubleCellValue(e.amount);
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 4,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.DoubleCellValue(
+            e.amount,
+          );
           sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: machColOffset + 5, rowIndex: 3 + i))
-            .value = xl.TextCellValue(e.regPageNo ?? '');
+              .cell(
+                xl.CellIndex.indexByColumnRow(
+                  columnIndex: machColOffset + 5,
+                  rowIndex: 3 + i,
+                ),
+              )
+              .value = xl.TextCellValue(
+            e.regPageNo ?? '',
+          );
         }
       }
 
-        machColOffset += headers.length + 1;
+      machColOffset += headers.length + 1;
     }
 
     if (excel.tables.containsKey('Sheet1')) {
@@ -1727,32 +2631,47 @@ class ExportService {
     }
 
     final dir = await getApplicationDocumentsDirectory();
-    final filename = '${baseName.replaceAll(RegExp(r'[^\\w\\s]'), '_')}_Export.xlsx';
+    final filename =
+        '${baseName.replaceAll(RegExp(r'[^\\w\\s]'), '_')}_Export.xlsx';
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(excel.encode()!);
     return file.path;
   }
 
-  Future<String> exportSingleMachineryToExcel(int setId, int machineryId) async {
+  Future<String> exportSingleMachineryToExcel(
+    int setId,
+    int machineryId,
+  ) async {
     final setModel = await _setsDao.getSetById(setId);
     if (setModel == null) throw Exception('Set not found');
 
     final scheme = await _schemesDao.getSchemeById(setModel.schemeId);
-    final isUselessScheme = (scheme?.category ?? '').toLowerCase() == 'useless_item';
+    final isUselessScheme =
+        (scheme?.category ?? '').toLowerCase() == 'useless_item';
     final machineryList = await _machineryDao.getMachineryForSet(setId);
-    final machinery = machineryList.where((m) => m.machineryId == machineryId).firstOrNull;
+    final machinery = machineryList
+        .where((m) => m.machineryId == machineryId)
+        .firstOrNull;
     if (machinery == null) throw Exception('Selected machinery not found');
 
     final excel = xl.Excel.createExcel();
     final baseName = '${scheme?.schemeName ?? 'Scheme'} ${setModel.setLabel}';
-    final sheetName = baseName.length > 31 ? baseName.substring(0, 31) : baseName;
+    final sheetName = baseName.length > 31
+        ? baseName.substring(0, 31)
+        : baseName;
     final sheet = excel[sheetName];
 
-    sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0)).value =
-        xl.TextCellValue(baseName);
+    sheet
+        .cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0))
+        .value = xl.TextCellValue(
+      baseName,
+    );
 
-    sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1)).value =
-        xl.TextCellValue(machinery.displayLabel);
+    sheet
+        .cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1))
+        .value = xl.TextCellValue(
+      machinery.displayLabel,
+    );
 
     final headers = isUselessScheme
         ? [
@@ -1765,9 +2684,18 @@ class ExportService {
             'Transferred To Scheme',
             'Remarks',
           ]
-        : ['Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount', 'Reg. Page No.'];
+        : [
+            'Sr.No',
+            'Date',
+            'Work Order No.',
+            'Voucher No.',
+            'Amount',
+            'Reg. Page No.',
+          ];
     for (int h = 0; h < headers.length; h++) {
-      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: h, rowIndex: 2));
+      final cell = sheet.cell(
+        xl.CellIndex.indexByColumnRow(columnIndex: h, rowIndex: 2),
+      );
       cell.value = xl.TextCellValue(headers[h]);
       cell.cellStyle = xl.CellStyle(
         bold: true,
@@ -1776,39 +2704,111 @@ class ExportService {
       );
     }
 
-    final entries = await _entriesDao.getEntriesForMachinery(machinery.machineryId!);
+    final entries = await _entriesDao.getEntriesForMachinery(
+      machinery.machineryId!,
+    );
     for (int i = 0; i < entries.length; i++) {
       final e = entries[i];
       if (isUselessScheme) {
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 3 + i)).value =
-        xl.IntCellValue(e.serialNo);
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 3 + i)).value =
-        xl.TextCellValue(e.entryDate);
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 3 + i)).value =
-        xl.TextCellValue(e.regPageNo ?? '');
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 3 + i)).value =
-        xl.TextCellValue(e.isDisabled ? 'Yes' : 'No');
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 3 + i)).value =
-        xl.TextCellValue(e.submittedToStoreDate ?? '');
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 3 + i)).value =
-        xl.TextCellValue(e.transferDate ?? '');
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 3 + i)).value =
-        xl.TextCellValue(e.transferredToScheme ?? '');
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 3 + i)).value =
-        xl.TextCellValue(e.remarks ?? e.notes ?? '');
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 3 + i),
+            )
+            .value = xl.IntCellValue(
+          e.serialNo,
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 3 + i),
+            )
+            .value = xl.TextCellValue(
+          e.entryDate,
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 3 + i),
+            )
+            .value = xl.TextCellValue(
+          e.regPageNo ?? '',
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 3 + i),
+            )
+            .value = xl.TextCellValue(
+          e.isDisabled ? 'Yes' : 'No',
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 3 + i),
+            )
+            .value = xl.TextCellValue(
+          e.submittedToStoreDate ?? '',
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 3 + i),
+            )
+            .value = xl.TextCellValue(
+          e.transferDate ?? '',
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: 3 + i),
+            )
+            .value = xl.TextCellValue(
+          e.transferredToScheme ?? '',
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 3 + i),
+            )
+            .value = xl.TextCellValue(
+          e.remarks ?? e.notes ?? '',
+        );
       } else {
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 3 + i)).value =
-        xl.IntCellValue(e.serialNo);
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 3 + i)).value =
-        xl.TextCellValue(e.entryDate);
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 3 + i)).value =
-        xl.TextCellValue(e.workOrderNo ?? '');
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 3 + i)).value =
-        e.voucherNo != null ? xl.IntCellValue(e.voucherNo!) : xl.TextCellValue('');
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 3 + i)).value =
-        xl.DoubleCellValue(e.amount);
-      sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 3 + i)).value =
-        xl.TextCellValue(e.regPageNo ?? '');
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 3 + i),
+            )
+            .value = xl.IntCellValue(
+          e.serialNo,
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 3 + i),
+            )
+            .value = xl.TextCellValue(
+          e.entryDate,
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: 3 + i),
+            )
+            .value = xl.TextCellValue(
+          e.workOrderNo ?? '',
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: 3 + i),
+            )
+            .value = e.voucherNo != null
+            ? xl.IntCellValue(e.voucherNo!)
+            : xl.TextCellValue('');
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: 3 + i),
+            )
+            .value = xl.DoubleCellValue(
+          e.amount,
+        );
+        sheet
+            .cell(
+              xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: 3 + i),
+            )
+            .value = xl.TextCellValue(
+          e.regPageNo ?? '',
+        );
       }
     }
 
@@ -1817,7 +2817,8 @@ class ExportService {
     }
 
     final dir = await getApplicationDocumentsDirectory();
-    final filename = '${baseName.replaceAll(RegExp(r'[^\\w\\s]'), '_')}_${machinery.machineryType}_Export.xlsx';
+    final filename =
+        '${baseName.replaceAll(RegExp(r'[^\\w\\s]'), '_')}_${machinery.machineryType}_Export.xlsx';
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(excel.encode()!);
     return file.path;
@@ -1840,14 +2841,20 @@ class ExportService {
         'Scheme,Set,Machinery Type,Specs,Sr.No,Date,Reg. Page No.,Disabled/Closed,Submitted To Store Date,Transfer Date,Transferred To Scheme,Remarks',
       );
     } else {
-      buffer.writeln('Scheme,Set,Machinery Type,Specs,Sr.No,Date,Work Order No.,Voucher No.,Amount,Reg. Page No.,Notes');
+      buffer.writeln(
+        'Scheme,Set,Machinery Type,Specs,Sr.No,Date,Work Order No.,Voucher No.,Amount,Reg. Page No.,Notes',
+      );
     }
 
     for (final setModel in sets) {
-      final machineryList = await _machineryDao.getMachineryForSet(setModel.setId!);
+      final machineryList = await _machineryDao.getMachineryForSet(
+        setModel.setId!,
+      );
 
       for (final machinery in machineryList) {
-        final entries = await _entriesDao.getEntriesForMachinery(machinery.machineryId!);
+        final entries = await _entriesDao.getEntriesForMachinery(
+          machinery.machineryId!,
+        );
 
         for (final e in entries) {
           if (isUselessScheme) {
@@ -1864,7 +2871,8 @@ class ExportService {
     }
 
     final dir = await getApplicationDocumentsDirectory();
-    final filename = '${scheme.schemeName.replaceAll(RegExp(r'[^\w\s]'), '_')}_Export.csv';
+    final filename =
+        '${scheme.schemeName.replaceAll(RegExp(r'[^\w\s]'), '_')}_Export.csv';
     final file = File('${dir.path}/$filename');
     await file.writeAsString(buffer.toString());
     return file.path;
@@ -1874,7 +2882,8 @@ class ExportService {
     final setModel = await _setsDao.getSetById(setId);
     if (setModel == null) throw Exception('Set not found');
     final scheme = await _schemesDao.getSchemeById(setModel.schemeId);
-    final isUselessScheme = (scheme?.category ?? '').toLowerCase() == 'useless_item';
+    final isUselessScheme =
+        (scheme?.category ?? '').toLowerCase() == 'useless_item';
     final machineryList = await _machineryDao.getMachineryForSet(setId);
 
     final buffer = StringBuffer();
@@ -1884,11 +2893,15 @@ class ExportService {
         'Scheme,Set,Machinery Type,Specs,Sr.No,Date,Reg. Page No.,Disabled/Closed,Submitted To Store Date,Transfer Date,Transferred To Scheme,Remarks',
       );
     } else {
-      buffer.writeln('Scheme,Set,Machinery Type,Specs,Sr.No,Date,Work Order No.,Voucher No.,Amount,Reg. Page No.,Notes');
+      buffer.writeln(
+        'Scheme,Set,Machinery Type,Specs,Sr.No,Date,Work Order No.,Voucher No.,Amount,Reg. Page No.,Notes',
+      );
     }
 
     for (final machinery in machineryList) {
-      final entries = await _entriesDao.getEntriesForMachinery(machinery.machineryId!);
+      final entries = await _entriesDao.getEntriesForMachinery(
+        machinery.machineryId!,
+      );
       for (final e in entries) {
         if (isUselessScheme) {
           buffer.writeln(
@@ -1914,10 +2927,13 @@ class ExportService {
     final setModel = await _setsDao.getSetById(setId);
     if (setModel == null) throw Exception('Set not found');
     final scheme = await _schemesDao.getSchemeById(setModel.schemeId);
-    final isUselessScheme = (scheme?.category ?? '').toLowerCase() == 'useless_item';
+    final isUselessScheme =
+        (scheme?.category ?? '').toLowerCase() == 'useless_item';
 
     final machineryList = await _machineryDao.getMachineryForSet(setId);
-    final machinery = machineryList.where((m) => m.machineryId == machineryId).firstOrNull;
+    final machinery = machineryList
+        .where((m) => m.machineryId == machineryId)
+        .firstOrNull;
     if (machinery == null) throw Exception('Selected machinery not found');
 
     final buffer = StringBuffer();
@@ -1927,10 +2943,14 @@ class ExportService {
         'Scheme,Set,Machinery Type,Specs,Sr.No,Date,Reg. Page No.,Disabled/Closed,Submitted To Store Date,Transfer Date,Transferred To Scheme,Remarks',
       );
     } else {
-      buffer.writeln('Scheme,Set,Machinery Type,Specs,Sr.No,Date,Work Order No.,Voucher No.,Amount,Reg. Page No.,Notes');
+      buffer.writeln(
+        'Scheme,Set,Machinery Type,Specs,Sr.No,Date,Work Order No.,Voucher No.,Amount,Reg. Page No.,Notes',
+      );
     }
 
-    final entries = await _entriesDao.getEntriesForMachinery(machinery.machineryId!);
+    final entries = await _entriesDao.getEntriesForMachinery(
+      machinery.machineryId!,
+    );
     for (final e in entries) {
       if (isUselessScheme) {
         buffer.writeln(
@@ -1953,8 +2973,15 @@ class ExportService {
 
   // ─────────────────── Miscellaneous Export ───────────────────
 
-  Future<List<_MiscRecordExport>> _loadMiscRecords({String? recordId}) async {
-    final rawRecords = await _miscDao.getAllRecords();
+  Future<List<_MiscRecordExport>> _loadMiscRecords({
+    String? recordId,
+    int? schemeId,
+    int? setId,
+  }) async {
+    final rawRecords = await _miscDao.getAllRecords(
+      schemeId: schemeId,
+      setId: setId,
+    );
     final all = rawRecords
         .map((e) => _MiscRecordExport.fromJson(Map<String, dynamic>.from(e)))
         .toList();
@@ -1962,16 +2989,30 @@ class ExportService {
     return all.where((r) => r.id == recordId).toList();
   }
 
-  Future<Uint8List> exportMiscellaneousToPdf({String? recordId}) async {
+  Future<Uint8List> exportMiscellaneousToPdf({
+    String? recordId,
+    int? schemeId,
+    int? setId,
+  }) async {
     await _ensureFontsLoaded();
-    final records = await _loadMiscRecords(recordId: recordId);
+    final records = await _loadMiscRecords(
+      recordId: recordId,
+      schemeId: schemeId,
+      setId: setId,
+    );
     if (records.isEmpty) {
       throw Exception('No miscellaneous data found to export');
     }
 
     final pdf = pw.Document(theme: _pdfTheme());
-    final totalEntries = records.fold<int>(0, (sum, r) => sum + r.entries.length);
-    final totalAmount = records.fold<double>(0, (sum, r) => sum + r.totalAmount);
+    final totalEntries = records.fold<int>(
+      0,
+      (sum, r) => sum + r.entries.length,
+    );
+    final totalAmount = records.fold<double>(
+      0,
+      (sum, r) => sum + r.totalAmount,
+    );
 
     pdf.addPage(
       pw.MultiPage(
@@ -1980,38 +3021,51 @@ class ExportService {
         footer: (context) => pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.Text('Prepared by City Water Works',
-                style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
-            pw.Text('Page ${context.pageNumber} of ${context.pagesCount}',
-                style: const pw.TextStyle(fontSize: 8)),
+            pw.Text(
+              'Prepared by City Water Works',
+              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+            ),
+            pw.Text(
+              'Page ${context.pageNumber} of ${context.pagesCount}',
+              style: const pw.TextStyle(fontSize: 8),
+            ),
           ],
         ),
         build: (context) => [
-          pw.Text('Miscellaneous Expenditure Report',
-              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.Text(
+            'Miscellaneous Expenditure Report',
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+          ),
           pw.SizedBox(height: 4),
-          pw.Text('Generated on ${_nowFormatted()}', style: const pw.TextStyle(fontSize: 10)),
+          pw.Text(
+            'Generated on ${_nowFormatted()}',
+            style: const pw.TextStyle(fontSize: 10),
+          ),
           pw.SizedBox(height: 8),
-            pw.Text('Total Items: ${records.length} | Total Entries: $totalEntries | Total Amount: ${_formatAmount(totalAmount)}',
-              style: const pw.TextStyle(fontSize: 11)),
+          pw.Text(
+            'Total Items: ${records.length} | Total Entries: $totalEntries | Total Amount: ${_formatAmount(totalAmount)}',
+            style: const pw.TextStyle(fontSize: 11),
+          ),
           pw.SizedBox(height: 12),
           ...records.map((record) {
             final rows = record.entries.isEmpty
                 ? [
-                    ['-', '-', '-', '-', '-', '-']
+                    ['-', '-', '-', '-', '-', '-'],
                   ]
                 : record.entries
-                    .asMap()
-                    .entries
-                    .map((entry) => [
+                      .asMap()
+                      .entries
+                      .map(
+                        (entry) => [
                           '${entry.key + 1}',
                           entry.value.entryDate,
                           entry.value.workOrderNo ?? '-',
                           entry.value.voucherNo ?? '-',
                           _formatAmount(entry.value.amount),
                           entry.value.regPageNo ?? '-',
-                        ])
-                    .toList();
+                        ],
+                      )
+                      .toList();
 
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -2021,18 +3075,37 @@ class ExportService {
                   padding: const pw.EdgeInsets.all(6),
                   decoration: pw.BoxDecoration(color: PdfColors.grey200),
                   child: pw.Text(
-                    '${record.title} (${record.category}) | Entries: ${record.entries.length} | Total: ${_formatAmount(record.totalAmount)}',
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+                    '${record.title} (${record.category}) | Scheme: ${record.schemeName ?? 'Unassigned'} | Set: ${record.setLabel ?? 'Unassigned'} | Entries: ${record.entries.length} | Total: ${_formatAmount(record.totalAmount)}',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 10,
+                    ),
                   ),
                 ),
                 pw.TableHelper.fromTextArray(
-                  headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 9,
-                      fontFallback: _fontFallback ?? []),
-                  headerDecoration: pw.BoxDecoration(color: PdfColor.fromHex('#1E3A5F')),
-                  cellStyle: pw.TextStyle(fontSize: 8, fontFallback: _fontFallback ?? []),
+                  headerStyle: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.white,
+                    fontSize: 9,
+                    fontFallback: _fontFallback ?? [],
+                  ),
+                  headerDecoration: pw.BoxDecoration(
+                    color: PdfColor.fromHex('#1E3A5F'),
+                  ),
+                  cellStyle: pw.TextStyle(
+                    fontSize: 8,
+                    fontFallback: _fontFallback ?? [],
+                  ),
                   cellAlignment: pw.Alignment.center,
                   headerAlignment: pw.Alignment.center,
-                  headers: const ['Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount (PKR)', 'Reg. Page No.'],
+                  headers: const [
+                    'Sr.No',
+                    'Date',
+                    'Work Order No.',
+                    'Voucher No.',
+                    'Amount (PKR)',
+                    'Reg. Page No.',
+                  ],
                   data: rows,
                 ),
                 pw.SizedBox(height: 10),
@@ -2046,18 +3119,38 @@ class ExportService {
     return pdf.save();
   }
 
-  Future<String> exportMiscellaneousToExcel({String? recordId}) async {
-    final records = await _loadMiscRecords(recordId: recordId);
+  Future<String> exportMiscellaneousToExcel({
+    String? recordId,
+    int? schemeId,
+    int? setId,
+  }) async {
+    final records = await _loadMiscRecords(
+      recordId: recordId,
+      schemeId: schemeId,
+      setId: setId,
+    );
     if (records.isEmpty) {
       throw Exception('No miscellaneous data found to export');
     }
 
     final excel = xl.Excel.createExcel();
     final sheet = excel['Miscellaneous'];
-    final headers = ['Title', 'Category', 'Sr.No', 'Date', 'Work Order No.', 'Voucher No.', 'Amount (PKR)', 'Reg. Page No.'];
+    final headers = [
+      'Title',
+      'Category',
+      'Sr.No',
+      'Date',
+      'Work Order No.',
+      'Voucher No.',
+      'Amount (PKR)',
+      'Reg. Page No.',
+      'Scheme',
+    ];
 
     for (int i = 0; i < headers.length; i++) {
-      final cell = sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+      final cell = sheet.cell(
+        xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+      );
       cell.value = xl.TextCellValue(headers[i]);
       cell.cellStyle = xl.CellStyle(
         bold: true,
@@ -2069,24 +3162,72 @@ class ExportService {
     int row = 1;
     for (final record in records) {
       if (record.entries.isEmpty) {
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value =
-            xl.TextCellValue(record.title);
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value =
-            xl.TextCellValue(record.category);
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+            .value = xl.TextCellValue(
+          record.title,
+        );
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
+            .value = xl.TextCellValue(
+          record.category,
+        );
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row))
+            .value = xl.TextCellValue(
+          record.schemeName ?? 'Unassigned',
+        );
         row++;
         continue;
       }
 
       for (int i = 0; i < record.entries.length; i++) {
         final e = record.entries[i];
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = xl.TextCellValue(record.title);
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row)).value = xl.TextCellValue(record.category);
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = xl.IntCellValue(i + 1);
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = xl.TextCellValue(e.entryDate);
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = xl.TextCellValue(e.workOrderNo ?? '');
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = xl.TextCellValue(e.voucherNo ?? '');
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row)).value = xl.DoubleCellValue(e.amount);
-        sheet.cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row)).value = xl.TextCellValue(e.regPageNo ?? '');
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+            .value = xl.TextCellValue(
+          record.title,
+        );
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
+            .value = xl.TextCellValue(
+          record.category,
+        );
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
+            .value = xl.IntCellValue(
+          i + 1,
+        );
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row))
+            .value = xl.TextCellValue(
+          e.entryDate,
+        );
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row))
+            .value = xl.TextCellValue(
+          e.workOrderNo ?? '',
+        );
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row))
+            .value = xl.TextCellValue(
+          e.voucherNo ?? '',
+        );
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row))
+            .value = xl.DoubleCellValue(
+          e.amount,
+        );
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row))
+            .value = xl.TextCellValue(
+          e.regPageNo ?? '',
+        );
+        sheet
+            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row))
+            .value = xl.TextCellValue(
+          record.schemeName ?? 'Unassigned',
+        );
         row++;
       }
     }
@@ -2102,26 +3243,38 @@ class ExportService {
     return file.path;
   }
 
-  Future<String> exportMiscellaneousToCsv({String? recordId}) async {
-    final records = await _loadMiscRecords(recordId: recordId);
+  Future<String> exportMiscellaneousToCsv({
+    String? recordId,
+    int? schemeId,
+    int? setId,
+  }) async {
+    final records = await _loadMiscRecords(
+      recordId: recordId,
+      schemeId: schemeId,
+      setId: setId,
+    );
     if (records.isEmpty) {
       throw Exception('No miscellaneous data found to export');
     }
 
     final buffer = StringBuffer();
     buffer.write('\uFEFF');
-    buffer.writeln('Title,Category,Sr.No,Date,Work Order No.,Voucher No.,Amount (PKR),Reg. Page No.');
+    buffer.writeln(
+      'Title,Category,Sr.No,Date,Work Order No.,Voucher No.,Amount (PKR),Reg. Page No.,Scheme',
+    );
 
     for (final record in records) {
       if (record.entries.isEmpty) {
-        buffer.writeln('"${record.title}","${record.category}",,,,,');
+        buffer.writeln(
+          '"${record.title}","${record.category}",,,,,,,"${record.schemeName ?? 'Unassigned'}"',
+        );
         continue;
       }
 
       for (int i = 0; i < record.entries.length; i++) {
         final e = record.entries[i];
         buffer.writeln(
-          '"${record.title}","${record.category}",${i + 1},"${e.entryDate}","${e.workOrderNo ?? ''}","${e.voucherNo ?? ''}",${e.amount},"${e.regPageNo ?? ''}"',
+          '"${record.title}","${record.category}",${i + 1},"${e.entryDate}","${e.workOrderNo ?? ''}","${e.voucherNo ?? ''}",${e.amount},"${e.regPageNo ?? ''}","${record.schemeName ?? 'Unassigned'}"',
         );
       }
     }
@@ -2138,22 +3291,23 @@ class _MachineryTemplate {
   final String type;
   final String label;
 
-  _MachineryTemplate({
-    required this.type,
-    required this.label,
-  });
+  _MachineryTemplate({required this.type, required this.label});
 }
 
 class _MiscRecordExport {
   final String id;
   final String title;
   final String category;
+  final String? schemeName;
+  final String? setLabel;
   final List<_MiscEntryExport> entries;
 
   _MiscRecordExport({
     required this.id,
     required this.title,
     required this.category,
+    this.schemeName,
+    this.setLabel,
     required this.entries,
   });
 
@@ -2164,11 +3318,16 @@ class _MiscRecordExport {
       id: (json['id'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
       category: (json['category'] ?? 'Miscellaneous').toString(),
+      schemeName: json['schemeName']?.toString(),
+      setLabel: json['setLabel']?.toString(),
       entries: (json['entries'] is List)
           ? (json['entries'] as List)
-              .whereType<Map>()
-              .map((e) => _MiscEntryExport.fromJson(Map<String, dynamic>.from(e)))
-              .toList()
+                .whereType<Map>()
+                .map(
+                  (e) =>
+                      _MiscEntryExport.fromJson(Map<String, dynamic>.from(e)),
+                )
+                .toList()
           : <_MiscEntryExport>[],
     );
   }

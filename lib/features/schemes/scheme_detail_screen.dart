@@ -8,6 +8,7 @@ import '../../shared/utils/currency_utils.dart';
 import '../sets/set_detail_screen.dart';
 import '../sets/set_form.dart';
 import '../export/export_screen.dart';
+import 'scheme_form.dart';
 
 class SchemeDetailScreen extends StatefulWidget {
   final int schemeId;
@@ -47,9 +48,9 @@ class _SchemeDetailScreenState extends State<SchemeDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -68,6 +69,23 @@ class _SchemeDetailScreenState extends State<SchemeDetailScreen> {
         ),
       ),
     );
+    if (result == true) {
+      _loadData();
+    }
+  }
+
+  Future<void> _editScheme() async {
+    if (_scheme == null) return;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: SchemeForm(scheme: _scheme),
+        ),
+      ),
+    );
     if (result == true) _loadData();
   }
 
@@ -76,9 +94,14 @@ class _SchemeDetailScreenState extends State<SchemeDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Set'),
-        content: Text('Delete "${set.setLabel}" and all its machinery and entries?'),
+        content: Text(
+          'Delete "${set.setLabel}" and all its Parts/Supplies, Useless Items, and Miscellaneous records?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -91,6 +114,17 @@ class _SchemeDetailScreenState extends State<SchemeDetailScreen> {
       await _setsDao.deleteSet(set.setId!);
       _loadData();
     }
+  }
+
+  Future<void> _openSetDetails(SetModel set) async {
+    if (set.setId == null) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SetDetailScreen(setId: set.setId!),
+      ),
+    );
+    _loadData();
   }
 
   @override
@@ -129,12 +163,25 @@ class _SchemeDetailScreenState extends State<SchemeDetailScreen> {
                         Center(
                           child: Column(
                             children: [
-                              Icon(Icons.settings_outlined, size: 64, color: AppColors.textHint),
+                              Icon(
+                                Icons.settings_outlined,
+                                size: 64,
+                                color: AppColors.textHint,
+                              ),
                               const SizedBox(height: 12),
-                              Text('No sets yet', style: Theme.of(context).textTheme.headlineSmall),
+                              Text(
+                                'No sets yet',
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall,
+                              ),
                               const SizedBox(height: 8),
-                              Text('Add a set to start recording entries',
-                                  style: TextStyle(color: AppColors.textSecondary)),
+                              Text(
+                                'Add a set to start recording entries',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
                               const SizedBox(height: 24),
                               ElevatedButton.icon(
                                 onPressed: _addSet,
@@ -155,24 +202,41 @@ class _SchemeDetailScreenState extends State<SchemeDetailScreen> {
                             padding: const EdgeInsets.all(16),
                             child: isCompact
                                 ? Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
                                         children: [
                                           Container(
                                             padding: const EdgeInsets.all(12),
                                             decoration: BoxDecoration(
-                                              color: AppColors.primary.withOpacity(0.1),
-                                              borderRadius: BorderRadius.circular(10),
+                                              color: AppColors.primary
+                                                  .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                             ),
-                                            child: const Icon(Icons.water_drop,
-                                                color: AppColors.primary, size: 28),
+                                            child: const Icon(
+                                              Icons.water_drop,
+                                              color: AppColors.primary,
+                                              size: 28,
+                                            ),
                                           ),
                                           const SizedBox(width: 12),
                                           Expanded(
-                                            child: Text(_scheme!.schemeName,
-                                                style: Theme.of(context).textTheme.titleLarge,
-                                                overflow: TextOverflow.ellipsis),
+                                            child: Text(
+                                              _scheme!.schemeName,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.titleLarge,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          IconButton(
+                                            onPressed: _editScheme,
+                                            icon: const Icon(
+                                              Icons.edit_outlined,
+                                            ),
+                                            tooltip: 'Edit Scheme',
                                           ),
                                         ],
                                       ),
@@ -192,19 +256,31 @@ class _SchemeDetailScreenState extends State<SchemeDetailScreen> {
                                       Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: AppColors.primary.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(10),
+                                          color: AppColors.primary.withOpacity(
+                                            0.1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
                                         ),
-                                        child: const Icon(Icons.water_drop,
-                                            color: AppColors.primary, size: 28),
+                                        child: const Icon(
+                                          Icons.water_drop,
+                                          color: AppColors.primary,
+                                          size: 28,
+                                        ),
                                       ),
                                       const SizedBox(width: 16),
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            Text(_scheme!.schemeName,
-                                                style: Theme.of(context).textTheme.titleLarge),
+                                            Text(
+                                              _scheme!.schemeName,
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.titleLarge,
+                                            ),
                                             const SizedBox(height: 4),
                                             Text(
                                               'Total: ${CurrencyUtils.formatAmount(_scheme!.totalAmount)}',
@@ -217,6 +293,11 @@ class _SchemeDetailScreenState extends State<SchemeDetailScreen> {
                                           ],
                                         ),
                                       ),
+                                      IconButton(
+                                        onPressed: _editScheme,
+                                        icon: const Icon(Icons.edit_outlined),
+                                        tooltip: 'Edit Scheme',
+                                      ),
                                     ],
                                   ),
                           ),
@@ -224,151 +305,227 @@ class _SchemeDetailScreenState extends State<SchemeDetailScreen> {
                         const SizedBox(height: 16),
 
                         // Sets list
-                        Text('Sets (${_sets.length})',
-                            style: Theme.of(context).textTheme.titleLarge),
+                        Text(
+                          (_scheme?.category ?? '').toLowerCase() ==
+                                  'useless_item'
+                              ? 'Useless Item Sets (${_sets.length})'
+                              : 'Parts / Supplies Sets (${_sets.length})',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
                         const SizedBox(height: 8),
 
-                        ..._sets.map((set) => Card(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(12),
-                                onTap: () async {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => SetDetailScreen(setId: set.setId!),
-                                    ),
-                                  );
-                                  _loadData();
-                                },
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: isCompact
-                                      ? Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                CircleAvatar(
-                                                  backgroundColor: AppColors.accent.withOpacity(0.15),
-                                                  child: Text(
-                                                    '${set.setNumber}',
-                                                    style: const TextStyle(
-                                                      color: AppColors.accent,
-                                                      fontWeight: FontWeight.bold,
+                        ..._sets.map(
+                          (set) => Card(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => _openSetDetails(set),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  children: [
+                                    isCompact
+                                        ? Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  CircleAvatar(
+                                                    backgroundColor: AppColors
+                                                        .accent
+                                                        .withOpacity(0.15),
+                                                    child: Text(
+                                                      '${set.setNumber}',
+                                                      style: const TextStyle(
+                                                        color: AppColors.accent,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
-                                                const SizedBox(width: 12),
-                                                Expanded(
-                                                  child: Text(set.setLabel,
-                                                      style: Theme.of(context).textTheme.titleMedium,
-                                                      overflow: TextOverflow.ellipsis),
-                                                ),
-                                                GestureDetector(
-                                                  onTap: () => _deleteSet(set),
-                                                  child: const Icon(Icons.delete_outline,
-                                                      size: 20, color: AppColors.error),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Wrap(
-                                              spacing: 12,
-                                              runSpacing: 6,
-                                              children: [
-                                                Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(Icons.precision_manufacturing,
-                                                        size: 14, color: AppColors.textSecondary),
-                                                    const SizedBox(width: 4),
-                                                    Text('${set.machineryCount} machinery',
-                                                        style: Theme.of(context).textTheme.bodySmall),
-                                                  ],
-                                                ),
-                                                Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    Icon(Icons.receipt,
-                                                        size: 14, color: AppColors.textSecondary),
-                                                    const SizedBox(width: 4),
-                                                    Text('${set.entryCount} entries',
-                                                        style: Theme.of(context).textTheme.bodySmall),
-                                                  ],
-                                                ),
-                                                Text(
-                                                  CurrencyUtils.formatAmount(set.totalAmount),
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: AppColors.primary,
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Text(
+                                                      set.setLabel,
+                                                      style: Theme.of(
+                                                        context,
+                                                      ).textTheme.titleMedium,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        )
-                                      : Row(
-                                          children: [
-                                            CircleAvatar(
-                                              backgroundColor: AppColors.accent.withOpacity(0.15),
-                                              child: Text(
-                                                '${set.setNumber}',
-                                                style: const TextStyle(
-                                                  color: AppColors.accent,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 16),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(set.setLabel,
-                                                      style: Theme.of(context).textTheme.titleMedium),
-                                                  const SizedBox(height: 4),
-                                                  Row(
-                                                    children: [
-                                                      Icon(Icons.precision_manufacturing,
-                                                          size: 14, color: AppColors.textSecondary),
-                                                      const SizedBox(width: 4),
-                                                      Text('${set.machineryCount} machinery',
-                                                          style: Theme.of(context).textTheme.bodySmall),
-                                                      const SizedBox(width: 12),
-                                                      Icon(Icons.receipt,
-                                                          size: 14, color: AppColors.textSecondary),
-                                                      const SizedBox(width: 4),
-                                                      Text('${set.entryCount} entries',
-                                                          style: Theme.of(context).textTheme.bodySmall),
-                                                    ],
+                                                  GestureDetector(
+                                                    onTap: () =>
+                                                        _deleteSet(set),
+                                                    child: const Icon(
+                                                      Icons.delete_outline,
+                                                      size: 20,
+                                                      color: AppColors.error,
+                                                    ),
                                                   ),
                                                 ],
                                               ),
-                                            ),
-                                            Column(
-                                              crossAxisAlignment: CrossAxisAlignment.end,
-                                              children: [
-                                                Text(
-                                                  CurrencyUtils.formatAmount(set.totalAmount),
+                                              const SizedBox(height: 8),
+                                              Wrap(
+                                                spacing: 12,
+                                                runSpacing: 6,
+                                                children: [
+                                                  Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons
+                                                            .precision_manufacturing,
+                                                        size: 14,
+                                                        color: AppColors
+                                                            .textSecondary,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        '${set.machineryCount} machinery',
+                                                        style: Theme.of(
+                                                          context,
+                                                        ).textTheme.bodySmall,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.receipt,
+                                                        size: 14,
+                                                        color: AppColors
+                                                            .textSecondary,
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        '${set.entryCount} entries',
+                                                        style: Theme.of(
+                                                          context,
+                                                        ).textTheme.bodySmall,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  Text(
+                                                    CurrencyUtils.formatAmount(
+                                                      set.totalAmount,
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: AppColors.primary,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          )
+                                        : Row(
+                                            children: [
+                                              CircleAvatar(
+                                                backgroundColor: AppColors
+                                                    .accent
+                                                    .withOpacity(0.15),
+                                                child: Text(
+                                                  '${set.setNumber}',
                                                   style: const TextStyle(
+                                                    color: AppColors.accent,
                                                     fontWeight: FontWeight.bold,
-                                                    color: AppColors.primary,
                                                   ),
                                                 ),
-                                                const SizedBox(height: 4),
-                                                GestureDetector(
-                                                  onTap: () => _deleteSet(set),
-                                                  child: const Icon(Icons.delete_outline,
-                                                      size: 20, color: AppColors.error),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      set.setLabel,
+                                                      style: Theme.of(
+                                                        context,
+                                                      ).textTheme.titleMedium,
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons
+                                                              .precision_manufacturing,
+                                                          size: 14,
+                                                          color: AppColors
+                                                              .textSecondary,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 4,
+                                                        ),
+                                                        Text(
+                                                          '${set.machineryCount} machinery',
+                                                          style: Theme.of(
+                                                            context,
+                                                          ).textTheme.bodySmall,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 12,
+                                                        ),
+                                                        Icon(
+                                                          Icons.receipt,
+                                                          size: 14,
+                                                          color: AppColors
+                                                              .textSecondary,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 4,
+                                                        ),
+                                                        Text(
+                                                          '${set.entryCount} entries',
+                                                          style: Theme.of(
+                                                            context,
+                                                          ).textTheme.bodySmall,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
                                                 ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
+                                              ),
+                                              Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.end,
+                                                children: [
+                                                  Text(
+                                                    CurrencyUtils.formatAmount(
+                                                      set.totalAmount,
+                                                    ),
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: AppColors.primary,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 4),
+                                                  GestureDetector(
+                                                    onTap: () =>
+                                                        _deleteSet(set),
+                                                    child: const Icon(
+                                                      Icons.delete_outline,
+                                                      size: 20,
+                                                      color: AppColors.error,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                  ],
                                 ),
                               ),
-                            )),
+                            ),
+                          ),
+                        ),
 
                         const SizedBox(height: 80),
                       ],

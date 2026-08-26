@@ -33,12 +33,13 @@ class _ExportScreenState extends State<ExportScreen> {
   final _exportService = ExportService();
 
   List<Scheme> _schemes = [];
+  List<Scheme> _mainSchemes = [];
   List<SetModel> _sets = [];
   List<Machinery> _machineryForSet = [];
   Scheme? _selectedScheme;
   SetModel? _selectedSet;
   Machinery? _selectedMachinery;
-  List<Map<String, String>> _miscRecords = [];
+  List<Map<String, dynamic>> _miscRecords = [];
   String _miscExportMode = 'single';
   String _uselessExportMode = 'single';
   String? _selectedMiscRecordId;
@@ -71,20 +72,26 @@ class _ExportScreenState extends State<ExportScreen> {
       }
 
       final schemes = await _schemesDao.getSchemesByCategory(categoryToLoad);
+      final mainSchemes = await _schemesDao.getAllSchemes();
       setState(() {
         _schemeCategory = categoryToLoad;
         _schemes = schemes;
+        _mainSchemes = mainSchemes;
         _isLoading = false;
       });
 
       if (widget.schemeId != null) {
-        final scheme = schemes.where((s) => s.schemeId == widget.schemeId).firstOrNull;
+        final scheme = schemes
+            .where((s) => s.schemeId == widget.schemeId)
+            .firstOrNull;
         if (scheme != null) {
           _selectedScheme = scheme;
           _exportScope = widget.setId != null ? 'set' : 'scheme';
           await _loadSets(scheme.schemeId!);
           if (widget.setId != null) {
-            _selectedSet = _sets.where((s) => s.setId == widget.setId).firstOrNull;
+            _selectedSet = _sets
+                .where((s) => s.setId == widget.setId)
+                .firstOrNull;
             if (_selectedSet != null) {
               await _loadMachinery(_selectedSet!.setId!);
             }
@@ -102,17 +109,22 @@ class _ExportScreenState extends State<ExportScreen> {
   Future<void> _loadMiscRecords() async {
     final recordsRaw = await _miscDao.getAllRecords();
     final records = recordsRaw
-        .map((map) => {
-              'id': (map['id'] ?? '').toString(),
-              'title': (map['title'] ?? 'Untitled').toString(),
-            })
+        .map(
+          (map) => {
+            'id': (map['id'] ?? '').toString(),
+            'title': (map['title'] ?? 'Untitled').toString(),
+            'schemeId': map['schemeId'],
+            'setId': map['setId'],
+          },
+        )
         .where((entry) => (entry['id'] ?? '').isNotEmpty)
         .toList();
 
     if (!mounted) return;
     setState(() {
       _miscRecords = records;
-      if (_selectedMiscRecordId != null && !_miscRecords.any((r) => r['id'] == _selectedMiscRecordId)) {
+      if (_selectedMiscRecordId != null &&
+          !_miscRecords.any((r) => r['id'] == _selectedMiscRecordId)) {
         _selectedMiscRecordId = null;
       }
     });
@@ -157,33 +169,39 @@ class _ExportScreenState extends State<ExportScreen> {
     final isUselessCategoryExport = _isUselessCategoryExport;
 
     if (_exportScope != 'miscellaneous' && _selectedScheme == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.exportSelectScheme)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportSelectScheme)));
       return;
     }
-    if (isUselessCategoryExport && _uselessExportMode == 'single' && _selectedSet == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.exportSelectSet)),
-      );
+    if (isUselessCategoryExport &&
+        _uselessExportMode == 'single' &&
+        _selectedSet == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportSelectSet)));
       return;
     }
-    if (isUselessCategoryExport && _uselessExportMode == 'single' && _selectedMachinery == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.exportSelectMachineryField)),
-      );
+    if (isUselessCategoryExport &&
+        _uselessExportMode == 'single' &&
+        _selectedMachinery == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportSelectMachineryField)));
       return;
     }
     if (_exportScope == 'set' && _selectedSet == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.exportSelectSet)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportSelectSet)));
       return;
     }
-    if (_exportScope == 'miscellaneous' && _miscExportMode == 'single' && _selectedMiscRecordId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.exportSelectMiscItem)),
-      );
+    if (_exportScope == 'miscellaneous' &&
+        _miscExportMode == 'single' &&
+        _selectedMiscRecordId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportSelectMiscItem)));
       return;
     }
     setState(() => _isExporting = true);
@@ -197,7 +215,11 @@ class _ExportScreenState extends State<ExportScreen> {
         String filename;
         if (_exportScope == 'miscellaneous') {
           pdfBytes = await _exportService.exportMiscellaneousToPdf(
-            recordId: _miscExportMode == 'single' ? _selectedMiscRecordId : null,
+            recordId: _miscExportMode == 'single'
+                ? _selectedMiscRecordId
+                : null,
+            schemeId: _selectedScheme?.schemeId,
+            setId: widget.setId,
           );
           filename = _buildSuggestedFileName(extension: 'pdf');
         } else if (isUselessCategoryExport && _uselessExportMode == 'single') {
@@ -206,20 +228,30 @@ class _ExportScreenState extends State<ExportScreen> {
             _selectedMachinery!.machineryId!,
           );
           filename = _buildSuggestedFileName(extension: 'pdf');
-        } else if (isUselessCategoryExport && _uselessExportMode == 'complete') {
-          pdfBytes = await _exportService.exportSchemeToPdf(_selectedScheme!.schemeId!);
+        } else if (isUselessCategoryExport &&
+            _uselessExportMode == 'complete') {
+          pdfBytes = await _exportService.exportSchemeToPdf(
+            _selectedScheme!.schemeId!,
+          );
           filename = _buildSuggestedFileName(extension: 'pdf');
-        } else if (_exportScope == 'set' && _selectedSet != null && _selectedMachinery != null) {
+        } else if (_exportScope == 'set' &&
+            _selectedSet != null &&
+            _selectedMachinery != null) {
           pdfBytes = await _exportService.exportSingleMachineryToPdf(
             _selectedSet!.setId!,
             _selectedMachinery!.machineryId!,
           );
           filename = _buildSuggestedFileName(extension: 'pdf');
         } else if (_exportScope == 'set' && _selectedSet != null) {
-          pdfBytes = await _exportService.exportSetToPdf(_selectedSet!.setId!, includeSpecs: _includeSpecs);
+          pdfBytes = await _exportService.exportSetToPdf(
+            _selectedSet!.setId!,
+            includeSpecs: _includeSpecs,
+          );
           filename = _buildSuggestedFileName(extension: 'pdf');
         } else {
-          pdfBytes = await _exportService.exportSchemeToPdf(_selectedScheme!.schemeId!);
+          pdfBytes = await _exportService.exportSchemeToPdf(
+            _selectedScheme!.schemeId!,
+          );
           filename = _buildSuggestedFileName(extension: 'pdf');
         }
         suggestedFileName = filename;
@@ -228,15 +260,22 @@ class _ExportScreenState extends State<ExportScreen> {
         suggestedFileName = _buildSuggestedFileName(extension: 'xlsx');
         if (_exportScope == 'miscellaneous') {
           filePath = await _exportService.exportMiscellaneousToExcel(
-            recordId: _miscExportMode == 'single' ? _selectedMiscRecordId : null,
+            recordId: _miscExportMode == 'single'
+                ? _selectedMiscRecordId
+                : null,
+            schemeId: _selectedScheme?.schemeId,
+            setId: widget.setId,
           );
         } else if (isUselessCategoryExport && _uselessExportMode == 'single') {
           filePath = await _exportService.exportSingleMachineryToExcel(
             _selectedSet!.setId!,
             _selectedMachinery!.machineryId!,
           );
-        } else if (isUselessCategoryExport && _uselessExportMode == 'complete') {
-          filePath = await _exportService.exportSchemeToExcel(_selectedScheme!.schemeId!);
+        } else if (isUselessCategoryExport &&
+            _uselessExportMode == 'complete') {
+          filePath = await _exportService.exportSchemeToExcel(
+            _selectedScheme!.schemeId!,
+          );
         } else if (_exportScope == 'set' && _selectedSet != null) {
           if (_selectedMachinery != null) {
             filePath = await _exportService.exportSingleMachineryToExcel(
@@ -244,24 +283,35 @@ class _ExportScreenState extends State<ExportScreen> {
               _selectedMachinery!.machineryId!,
             );
           } else {
-            filePath = await _exportService.exportSetToExcel(_selectedSet!.setId!);
+            filePath = await _exportService.exportSetToExcel(
+              _selectedSet!.setId!,
+            );
           }
         } else {
-          filePath = await _exportService.exportSchemeToExcel(_selectedScheme!.schemeId!);
+          filePath = await _exportService.exportSchemeToExcel(
+            _selectedScheme!.schemeId!,
+          );
         }
       } else if (_exportFormat == 'csv') {
         suggestedFileName = _buildSuggestedFileName(extension: 'csv');
         if (_exportScope == 'miscellaneous') {
           filePath = await _exportService.exportMiscellaneousToCsv(
-            recordId: _miscExportMode == 'single' ? _selectedMiscRecordId : null,
+            recordId: _miscExportMode == 'single'
+                ? _selectedMiscRecordId
+                : null,
+            schemeId: _selectedScheme?.schemeId,
+            setId: widget.setId,
           );
         } else if (isUselessCategoryExport && _uselessExportMode == 'single') {
           filePath = await _exportService.exportSingleMachineryToCsv(
             _selectedSet!.setId!,
             _selectedMachinery!.machineryId!,
           );
-        } else if (isUselessCategoryExport && _uselessExportMode == 'complete') {
-          filePath = await _exportService.exportSchemeToCsv(_selectedScheme!.schemeId!);
+        } else if (isUselessCategoryExport &&
+            _uselessExportMode == 'complete') {
+          filePath = await _exportService.exportSchemeToCsv(
+            _selectedScheme!.schemeId!,
+          );
         } else if (_exportScope == 'set' && _selectedSet != null) {
           if (_selectedMachinery != null) {
             filePath = await _exportService.exportSingleMachineryToCsv(
@@ -269,10 +319,14 @@ class _ExportScreenState extends State<ExportScreen> {
               _selectedMachinery!.machineryId!,
             );
           } else {
-            filePath = await _exportService.exportSetToCsv(_selectedSet!.setId!);
+            filePath = await _exportService.exportSetToCsv(
+              _selectedSet!.setId!,
+            );
           }
         } else {
-          filePath = await _exportService.exportSchemeToCsv(_selectedScheme!.schemeId!);
+          filePath = await _exportService.exportSchemeToCsv(
+            _selectedScheme!.schemeId!,
+          );
         }
       }
 
@@ -295,7 +349,9 @@ class _ExportScreenState extends State<ExportScreen> {
     setState(() => _isExporting = true);
 
     try {
-      final pdfBytes = await _exportService.exportAllMachineryToPdf();
+      final pdfBytes = await _exportService.exportAllMachineryToPdf(
+        includeSpecs: _includeSpecs,
+      );
       final now = DateTime.now();
       final filename =
           'WaterSupplySchemeHistory_AllMachinery_${now.year.toString().padLeft(4, '0')}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}.pdf';
@@ -318,33 +374,43 @@ class _ExportScreenState extends State<ExportScreen> {
   String _buildSuggestedFileName({required String extension}) {
     if (_exportScope == 'miscellaneous') {
       if (_miscExportMode == 'single' && _selectedMiscRecordId != null) {
-        final item = _miscRecords.where((r) => r['id'] == _selectedMiscRecordId).firstOrNull;
-        final title = (item?['title'] ?? 'Miscellaneous').replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+        final item = _miscRecords
+            .where((r) => r['id'] == _selectedMiscRecordId)
+            .firstOrNull;
+        final title = (item?['title'] ?? 'Miscellaneous').replaceAll(
+          RegExp(r'[<>:"/\\|?*]'),
+          '_',
+        );
         return '${title}_Miscellaneous_Export.$extension';
       }
       return 'Miscellaneous_Export.$extension';
     }
 
     if (_isUselessCategoryExport && _uselessExportMode == 'complete') {
-      final schemeName = (_selectedScheme?.schemeName ?? 'Useless_Items').replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+      final schemeName = (_selectedScheme?.schemeName ?? 'Useless_Items')
+          .replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
       return '${schemeName}_Useless_Items_Complete.$extension';
     }
 
-    final machineryTypeForName = (_selectedMachinery?.machineryType.trim().isNotEmpty ?? false)
+    final machineryTypeForName =
+        (_selectedMachinery?.machineryType.trim().isNotEmpty ?? false)
         ? _selectedMachinery!.machineryType.trim()
         : 'Machinery';
 
     final rawBaseName = _exportScope == 'set' && _selectedSet != null
-      ? _selectedMachinery != null
-        ? '${_selectedSet!.setLabel}_${machineryTypeForName}_Export'
-        : '${_selectedSet!.setLabel}_Export'
-      : '${_selectedScheme?.schemeName ?? 'Export'}_Export';
+        ? _selectedMachinery != null
+              ? '${_selectedSet!.setLabel}_${machineryTypeForName}_Export'
+              : '${_selectedSet!.setLabel}_Export'
+        : '${_selectedScheme?.schemeName ?? 'Export'}_Export';
 
     final safeBaseName = rawBaseName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
     return '$safeBaseName.$extension';
   }
 
-  Future<String> _saveAsAndMoveExport(String generatedPath, [String? preferredFileName]) async {
+  Future<String> _saveAsAndMoveExport(
+    String generatedPath, [
+    String? preferredFileName,
+  ]) async {
     final defaultName = preferredFileName?.trim().isNotEmpty == true
         ? preferredFileName!
         : p.basename(generatedPath);
@@ -381,7 +447,10 @@ class _ExportScreenState extends State<ExportScreen> {
     return pickedPath;
   }
 
-  Future<String> _savePdfWithPathChoice(Uint8List bytes, String filename) async {
+  Future<String> _savePdfWithPathChoice(
+    Uint8List bytes,
+    String filename,
+  ) async {
     // Always save to app docs first — gives a real file path for sharing on all platforms
     final shareablePath = await _exportService.savePdf(bytes, filename);
 
@@ -415,7 +484,10 @@ class _ExportScreenState extends State<ExportScreen> {
     return destinationFile.path;
   }
 
-  Future<String?> _pickExportPath(String defaultName, List<String> extensions) async {
+  Future<String?> _pickExportPath(
+    String defaultName,
+    List<String> extensions,
+  ) async {
     String? pickedPath = await FilePicker.platform.saveFile(
       dialogTitle: 'Choose where to save export',
       fileName: defaultName,
@@ -446,16 +518,25 @@ class _ExportScreenState extends State<ExportScreen> {
           children: [
             const Icon(Icons.check_circle, color: AppColors.success, size: 48),
             const SizedBox(height: 12),
-            Text(AppLocalizations.of(ctx)!.exportFileSavedTo(path), style: const TextStyle(fontSize: 13)),
+            Text(
+              AppLocalizations.of(ctx)!.exportFileSavedTo(path),
+              style: const TextStyle(fontSize: 13),
+            ),
           ],
         ),
         actions: [
           TextButton.icon(
             onPressed: () async {
-              final savedPath = await _saveAsAndMoveExport(path, suggestedFileName);
+              final savedPath = await _saveAsAndMoveExport(
+                path,
+                suggestedFileName,
+              );
               if (!mounted || !ctx.mounted) return;
               Navigator.pop(ctx);
-              _showExportSuccess(savedPath, suggestedFileName: suggestedFileName);
+              _showExportSuccess(
+                savedPath,
+                suggestedFileName: suggestedFileName,
+              );
             },
             icon: const Icon(Icons.save_alt),
             label: Text(AppLocalizations.of(ctx)!.commonSaveAs),
@@ -480,7 +561,9 @@ class _ExportScreenState extends State<ExportScreen> {
           TextButton.icon(
             onPressed: () {
               Navigator.pop(ctx);
-              Share.shareXFiles([XFile(path)], text: AppLocalizations.of(ctx)!.exportShareText);
+              Share.shareXFiles([
+                XFile(path),
+              ], text: AppLocalizations.of(ctx)!.exportShareText);
             },
             icon: const Icon(Icons.chat),
             label: Text(AppLocalizations.of(ctx)!.commonWhatsappShare),
@@ -511,7 +594,10 @@ class _ExportScreenState extends State<ExportScreen> {
               padding: EdgeInsets.all(isCompact ? 12 : 16),
               children: [
                 // Scope selection
-                Text(l10n.exportScopeTitle, style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  l10n.exportScopeTitle,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 8),
                 if (isCompact) ...[
                   // Mobile: stack vertically, no icons, compact labels
@@ -520,9 +606,18 @@ class _ExportScreenState extends State<ExportScreen> {
                     child: SegmentedButton<String>(
                       showSelectedIcon: false,
                       segments: [
-                        ButtonSegment(value: 'set', label: Text(l10n.exportScopeSingleSet)),
-                        ButtonSegment(value: 'scheme', label: Text(l10n.exportScopeEntireSchemes)),
-                        ButtonSegment(value: 'miscellaneous', label: Text(l10n.navMiscellaneous)),
+                        ButtonSegment(
+                          value: 'set',
+                          label: Text(l10n.exportScopeSingleSet),
+                        ),
+                        ButtonSegment(
+                          value: 'scheme',
+                          label: Text(l10n.exportScopeEntireSchemes),
+                        ),
+                        ButtonSegment(
+                          value: 'miscellaneous',
+                          label: Text(l10n.navMiscellaneous),
+                        ),
                       ],
                       selected: {_exportScope},
                       onSelectionChanged: (v) => setState(() {
@@ -546,8 +641,14 @@ class _ExportScreenState extends State<ExportScreen> {
                       child: SegmentedButton<String>(
                         showSelectedIcon: false,
                         segments: [
-                          ButtonSegment(value: 'scheme', label: Text(l10n.navSchemes)),
-                          ButtonSegment(value: 'useless_item', label: Text(l10n.navUselessItems)),
+                          ButtonSegment(
+                            value: 'scheme',
+                            label: Text(l10n.navSchemes),
+                          ),
+                          ButtonSegment(
+                            value: 'useless_item',
+                            label: Text(l10n.navUselessItems),
+                          ),
                         ],
                         selected: {_schemeCategory},
                         onSelectionChanged: (v) async {
@@ -563,7 +664,11 @@ class _ExportScreenState extends State<ExportScreen> {
                       Expanded(
                         child: SegmentedButton<String>(
                           segments: [
-                            ButtonSegment(value: 'set', label: Text(l10n.exportScopeSingleSet), icon: const Icon(Icons.folder)),
+                            ButtonSegment(
+                              value: 'set',
+                              label: Text(l10n.exportScopeSingleSet),
+                              icon: const Icon(Icons.folder),
+                            ),
                             ButtonSegment(
                               value: 'scheme',
                               label: Text(l10n.exportScopeEntireSchemes),
@@ -595,7 +700,11 @@ class _ExportScreenState extends State<ExportScreen> {
                         Expanded(
                           child: SegmentedButton<String>(
                             segments: [
-                              ButtonSegment(value: 'scheme', label: Text(l10n.navSchemes), icon: const Icon(Icons.business)),
+                              ButtonSegment(
+                                value: 'scheme',
+                                label: Text(l10n.navSchemes),
+                                icon: const Icon(Icons.business),
+                              ),
                               ButtonSegment(
                                 value: 'useless_item',
                                 label: Text(l10n.navUselessItems),
@@ -623,7 +732,12 @@ class _ExportScreenState extends State<ExportScreen> {
                       border: OutlineInputBorder(),
                     ),
                     items: _schemes
-                        .map((s) => DropdownMenuItem(value: s, child: Text(s.schemeName)))
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(s.schemeName),
+                          ),
+                        )
                         .toList(),
                     onChanged: (s) async {
                       setState(() {
@@ -641,13 +755,24 @@ class _ExportScreenState extends State<ExportScreen> {
                   if (isUselessCategoryExport) ...[
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(l10n.exportMiscModeTitle, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      child: Text(
+                        l10n.exportMiscModeTitle,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                     SegmentedButton<String>(
                       showSelectedIcon: !isCompact,
                       segments: [
-                        ButtonSegment(value: 'single', label: Text(l10n.exportMiscSingleItem), icon: const Icon(Icons.filter_1)),
-                        ButtonSegment(value: 'complete', label: Text(l10n.exportMiscComplete), icon: const Icon(Icons.list_alt)),
+                        ButtonSegment(
+                          value: 'single',
+                          label: Text(l10n.exportMiscSingleItem),
+                          icon: const Icon(Icons.filter_1),
+                        ),
+                        ButtonSegment(
+                          value: 'complete',
+                          label: Text(l10n.exportMiscComplete),
+                          icon: const Icon(Icons.list_alt),
+                        ),
                       ],
                       selected: {_uselessExportMode},
                       onSelectionChanged: (v) => setState(() {
@@ -668,14 +793,59 @@ class _ExportScreenState extends State<ExportScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      DropdownButtonFormField<int>(
+                        initialValue: _selectedScheme?.category == 'scheme'
+                            ? _selectedScheme?.schemeId
+                            : 0,
+                        decoration: const InputDecoration(
+                          labelText: 'Scheme for Miscellaneous Report',
+                          prefixIcon: Icon(Icons.business_outlined),
+                        ),
+                        items: [
+                          const DropdownMenuItem<int>(
+                            value: 0,
+                            child: Text('All Schemes'),
+                          ),
+                          ..._mainSchemes.map(
+                            (scheme) => DropdownMenuItem<int>(
+                              value: scheme.schemeId,
+                              child: Text(scheme.schemeName),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedScheme = value == null || value == 0
+                                ? null
+                                : _mainSchemes
+                                      .where(
+                                        (scheme) => scheme.schemeId == value,
+                                      )
+                                      .firstOrNull;
+                            _selectedMiscRecordId = null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
-                        child: Text(l10n.exportMiscModeTitle, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        child: Text(
+                          l10n.exportMiscModeTitle,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ),
                       SegmentedButton<String>(
                         segments: [
-                          ButtonSegment(value: 'single', label: Text(l10n.exportMiscSingleItem), icon: const Icon(Icons.filter_1)),
-                          ButtonSegment(value: 'complete', label: Text(l10n.exportMiscComplete), icon: const Icon(Icons.list_alt)),
+                          ButtonSegment(
+                            value: 'single',
+                            label: Text(l10n.exportMiscSingleItem),
+                            icon: const Icon(Icons.filter_1),
+                          ),
+                          ButtonSegment(
+                            value: 'complete',
+                            label: Text(l10n.exportMiscComplete),
+                            icon: const Icon(Icons.list_alt),
+                          ),
                         ],
                         selected: {_miscExportMode},
                         onSelectionChanged: (v) => setState(() {
@@ -694,12 +864,28 @@ class _ExportScreenState extends State<ExportScreen> {
                             border: OutlineInputBorder(),
                           ),
                           items: _miscRecords
-                              .map((r) => DropdownMenuItem(
-                                    value: r['id'],
-                                    child: Text(r['title'] ?? l10n.commonUntitled),
-                                  ))
+                              .where(
+                                (record) =>
+                                    _selectedScheme == null ||
+                                    record['schemeId'] ==
+                                        _selectedScheme!.schemeId,
+                              )
+                              .where(
+                                (record) =>
+                                    widget.setId == null ||
+                                    record['setId'] == widget.setId,
+                              )
+                              .map(
+                                (r) => DropdownMenuItem(
+                                  value: r['id'] as String,
+                                  child: Text(
+                                    r['title'] ?? l10n.commonUntitled,
+                                  ),
+                                ),
+                              )
                               .toList(),
-                          onChanged: (v) => setState(() => _selectedMiscRecordId = v),
+                          onChanged: (v) =>
+                              setState(() => _selectedMiscRecordId = v),
                         )
                       else
                         ListTile(
@@ -713,7 +899,9 @@ class _ExportScreenState extends State<ExportScreen> {
                   ),
 
                 // Set selector (only if scope is 'set')
-                if (_exportScope == 'set' && (!isUselessCategoryExport || _uselessExportMode == 'single')) ...[
+                if (_exportScope == 'set' &&
+                    (!isUselessCategoryExport ||
+                        _uselessExportMode == 'single')) ...[
                   DropdownButtonFormField<SetModel>(
                     initialValue: _selectedSet,
                     decoration: InputDecoration(
@@ -721,7 +909,12 @@ class _ExportScreenState extends State<ExportScreen> {
                       border: OutlineInputBorder(),
                     ),
                     items: _sets
-                        .map((s) => DropdownMenuItem(value: s, child: Text(s.setLabel)))
+                        .map(
+                          (s) => DropdownMenuItem(
+                            value: s,
+                            child: Text(s.setLabel),
+                          ),
+                        )
                         .toList(),
                     onChanged: (s) async {
                       setState(() {
@@ -760,16 +953,36 @@ class _ExportScreenState extends State<ExportScreen> {
                 ],
 
                 // Format selection
-                Text(l10n.exportFormatTitle, style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  l10n.exportFormatTitle,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 8),
-                _buildFormatTile('pdf', l10n.exportFormatPdf, Icons.picture_as_pdf, Colors.red),
-                _buildFormatTile('excel', l10n.exportFormatExcel, Icons.table_chart, Colors.green),
-                _buildFormatTile('csv', l10n.exportFormatCsv, Icons.text_snippet, Colors.blue),
+                _buildFormatTile(
+                  'pdf',
+                  l10n.exportFormatPdf,
+                  Icons.picture_as_pdf,
+                  Colors.red,
+                ),
+                _buildFormatTile(
+                  'excel',
+                  l10n.exportFormatExcel,
+                  Icons.table_chart,
+                  Colors.green,
+                ),
+                _buildFormatTile(
+                  'csv',
+                  l10n.exportFormatCsv,
+                  Icons.text_snippet,
+                  Colors.blue,
+                ),
                 const SizedBox(height: 16),
                 if (_exportFormat == 'pdf' && _exportScope == 'set')
                   SwitchListTile(
                     title: const Text('Include Specifications'),
-                    subtitle: const Text('Add equipment specs before the table'),
+                    subtitle: const Text(
+                      'Add equipment specs before the table',
+                    ),
                     value: _includeSpecs,
                     onChanged: (v) => setState(() => _includeSpecs = v),
                   ),
@@ -784,9 +997,15 @@ class _ExportScreenState extends State<ExportScreen> {
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : const Icon(Icons.download),
-                    label: Text(_isExporting ? l10n.exportInProgress : l10n.navExport),
+                    label: Text(
+                      _isExporting ? l10n.exportInProgress : l10n.navExport,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -805,7 +1024,12 @@ class _ExportScreenState extends State<ExportScreen> {
     );
   }
 
-  Widget _buildFormatTile(String value, String label, IconData icon, Color color) {
+  Widget _buildFormatTile(
+    String value,
+    String label,
+    IconData icon,
+    Color color,
+  ) {
     return RadioListTile<String>(
       value: value,
       groupValue: _exportFormat,

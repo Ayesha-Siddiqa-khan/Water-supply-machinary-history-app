@@ -24,6 +24,28 @@ class BackupService {
     return '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}-${now.minute.toString().padLeft(2, '0')}-${now.second.toString().padLeft(2, '0')}';
   }
 
+  String _backupDateFormatted(DateTime date) {
+    final year = (date.year % 100).toString().padLeft(2, '0');
+    return '${date.day.toString().padLeft(2, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-$year';
+  }
+
+  Future<int> _nextBackupSequence(Directory backupDir, String date) async {
+    final pattern = RegExp(
+      '^${RegExp.escape(date)}_WaterSupplyMachineryHistory_Backup_(\\d+)\\.cww\$',
+      caseSensitive: false,
+    );
+    var highest = 0;
+    await for (final entity in backupDir.list()) {
+      if (entity is! File) continue;
+      final filename = p.basename(entity.path);
+      final match = pattern.firstMatch(filename);
+      final sequence = int.tryParse(match?.group(1) ?? '');
+      if (sequence != null && sequence > highest) highest = sequence;
+    }
+    return highest + 1;
+  }
+
   Future<Directory> _getBackupDirectory() async {
     final downloadsDir = await getDownloadsDirectory();
     final baseDir = downloadsDir ?? await getApplicationDocumentsDirectory();
@@ -72,7 +94,8 @@ class BackupService {
 
     final expected = <String, int>{};
     for (final entry in raw.entries) {
-      expected[entry.key.toString()] = int.tryParse(entry.value.toString()) ?? 0;
+      expected[entry.key.toString()] =
+          int.tryParse(entry.value.toString()) ?? 0;
     }
 
     final db = await _db.database;
@@ -124,19 +147,32 @@ class BackupService {
 
     // Add database file
     final dbBytes = await dbFile.readAsBytes();
-    archive.addFile(ArchiveFile('city_water_works.db', dbBytes.length, dbBytes));
+    archive.addFile(
+      ArchiveFile('city_water_works.db', dbBytes.length, dbBytes),
+    );
 
     // Add metadata JSON
     final metadataBytes = utf8.encode(jsonEncode(metadata));
-    archive.addFile(ArchiveFile('metadata.json', metadataBytes.length, metadataBytes));
+    archive.addFile(
+      ArchiveFile('metadata.json', metadataBytes.length, metadataBytes),
+    );
 
     // Encode as zip
     final zipBytes = ZipEncoder().encode(archive);
 
     // Save backup file
     final backupDir = await _getBackupDirectory();
-    final filename = 'WaterSupplyMachineryHistory_Backup_${_nowFormatted()}.cww';
-    final backupFile = File('${backupDir.path}/$filename');
+    final backupDate = _backupDateFormatted(DateTime.now());
+    var sequence = await _nextBackupSequence(backupDir, backupDate);
+    var filename =
+        '${backupDate}_WaterSupplyMachineryHistory_Backup_$sequence.cww';
+    var backupFile = File('${backupDir.path}/$filename');
+    while (await backupFile.exists()) {
+      sequence++;
+      filename =
+          '${backupDate}_WaterSupplyMachineryHistory_Backup_$sequence.cww';
+      backupFile = File('${backupDir.path}/$filename');
+    }
     await backupFile.writeAsBytes(zipBytes!);
 
     // Re-open DB for normal app usage after backup is created.
@@ -157,7 +193,10 @@ class BackupService {
     return target.path;
   }
 
-  Future<String> saveBackupToPath(String backupPath, String destinationPath) async {
+  Future<String> saveBackupToPath(
+    String backupPath,
+    String destinationPath,
+  ) async {
     final source = File(backupPath);
     if (!await source.exists()) {
       throw Exception('Backup file not found');
@@ -214,7 +253,9 @@ class BackupService {
       final schemaVersion = metadata['schema_version'] ?? 1;
       // Validate schema version
       if (schemaVersion > 1) {
-        throw Exception('Backup from newer app version (schema v$schemaVersion). Please update the app.');
+        throw Exception(
+          'Backup from newer app version (schema v$schemaVersion). Please update the app.',
+        );
       }
     }
 
@@ -241,7 +282,9 @@ class BackupService {
     // Write restored DB
     final dbContent = dbBackupFile.content;
     await targetFile.writeAsBytes(
-      dbContent is Uint8List ? dbContent : Uint8List.fromList(dbContent as List<int>),
+      dbContent is Uint8List
+          ? dbContent
+          : Uint8List.fromList(dbContent as List<int>),
     );
 
     // Re-initialize database
@@ -265,12 +308,14 @@ class BackupService {
     for (final f in files) {
       final file = File(f.path);
       final stat = await file.stat();
-      backups.add(BackupInfo(
-        path: f.path,
-        filename: f.path.split(Platform.pathSeparator).last,
-        size: stat.size,
-        date: stat.modified,
-      ));
+      backups.add(
+        BackupInfo(
+          path: f.path,
+          filename: f.path.split(Platform.pathSeparator).last,
+          size: stat.size,
+          date: stat.modified,
+        ),
+      );
     }
 
     backups.sort((a, b) => b.date.compareTo(a.date));

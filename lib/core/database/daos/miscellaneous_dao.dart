@@ -8,10 +8,28 @@ class MiscellaneousDao {
     return '${now.day.toString().padLeft(2, '0')}-${now.month.toString().padLeft(2, '0')}-${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
   }
 
-  Future<List<Map<String, dynamic>>> getAllRecords() async {
+  Future<List<Map<String, dynamic>>> getAllRecords({
+    int? schemeId,
+    int? setId,
+  }) async {
     final db = await _db.database;
-    final items = await db.query('miscellaneous_items', orderBy: 'item_id ASC');
-    final entries = await db.query('miscellaneous_entries', orderBy: 'item_id ASC, serial_no ASC');
+    final items = await db.rawQuery(
+      '''
+      SELECT mi.*, s.scheme_name, st.set_label
+      FROM miscellaneous_items mi
+      LEFT JOIN schemes s ON s.scheme_id = mi.scheme_id
+      LEFT JOIN sets st ON st.set_id = mi.set_id
+      WHERE 1 = 1
+      ${schemeId == null ? '' : 'AND mi.scheme_id = ?'}
+      ${setId == null ? '' : 'AND mi.set_id = ?'}
+      ORDER BY mi.item_id ASC
+    ''',
+      [if (schemeId != null) schemeId, if (setId != null) setId],
+    );
+    final entries = await db.query(
+      'miscellaneous_entries',
+      orderBy: 'item_id ASC, serial_no ASC',
+    );
 
     final entriesByItem = <int, List<Map<String, dynamic>>>{};
     for (final row in entries) {
@@ -37,6 +55,10 @@ class MiscellaneousDao {
       }
       return {
         'id': itemId.toString(),
+        'schemeId': item['scheme_id'],
+        'schemeName': item['scheme_name']?.toString(),
+        'setId': item['set_id'],
+        'setLabel': item['set_label']?.toString(),
         'title': (item['title'] ?? '').toString(),
         'category': category,
         'entries': itemEntries,
@@ -54,6 +76,8 @@ class MiscellaneousDao {
 
       for (final record in records) {
         final itemId = await txn.insert('miscellaneous_items', {
+          'scheme_id': record['schemeId'],
+          'set_id': record['setId'],
           'title': (record['title'] ?? '').toString(),
           'category': (record['category'] ?? 'Miscellaneous').toString(),
           'created_at': now,

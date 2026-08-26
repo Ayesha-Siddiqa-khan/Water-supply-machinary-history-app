@@ -13,10 +13,16 @@ class SchemesDao {
     return getSchemesByCategory('scheme');
   }
 
-  Future<List<Scheme>> getSchemesByCategory(String category) async {
+  Future<List<Scheme>> getSchemesByCategory(
+    String category, {
+    int? parentSchemeId,
+    int? parentSetId,
+  }) async {
     final db = await _db.database;
-    final result = await db.rawQuery('''
-      SELECT s.*,
+    final result = await db.rawQuery(
+      '''
+      SELECT s.*, p.scheme_name AS parent_scheme_name,
+        pst.set_label AS parent_set_label,
         (SELECT COUNT(*) FROM sets WHERE sets.scheme_id = s.scheme_id) as set_count,
         (SELECT COALESCE(SUM(be.amount), 0)
          FROM billing_entries be
@@ -24,16 +30,28 @@ class SchemesDao {
          JOIN sets st ON st.set_id = m.set_id
          WHERE st.scheme_id = s.scheme_id) as total_amount
       FROM schemes s
+      LEFT JOIN schemes p ON p.scheme_id = s.parent_scheme_id
+      LEFT JOIN sets pst ON pst.set_id = s.parent_set_id
       WHERE LOWER(s.category) = LOWER(?)
+        ${parentSchemeId == null ? '' : 'AND s.parent_scheme_id = ?'}
+        ${parentSetId == null ? '' : 'AND s.parent_set_id = ?'}
       ORDER BY s.scheme_name ASC
-    ''', [category]);
+    ''',
+      [
+        category,
+        if (parentSchemeId != null) parentSchemeId,
+        if (parentSetId != null) parentSetId,
+      ],
+    );
     return result.map((r) => Scheme.fromMap(r)).toList();
   }
 
   Future<Scheme?> getSchemeById(int id) async {
     final db = await _db.database;
-    final result = await db.rawQuery('''
-      SELECT s.*,
+    final result = await db.rawQuery(
+      '''
+      SELECT s.*, p.scheme_name AS parent_scheme_name,
+        pst.set_label AS parent_set_label,
         (SELECT COUNT(*) FROM sets WHERE sets.scheme_id = s.scheme_id) as set_count,
         (SELECT COALESCE(SUM(be.amount), 0)
          FROM billing_entries be
@@ -41,8 +59,12 @@ class SchemesDao {
          JOIN sets st ON st.set_id = m.set_id
          WHERE st.scheme_id = s.scheme_id) as total_amount
       FROM schemes s
+      LEFT JOIN schemes p ON p.scheme_id = s.parent_scheme_id
+      LEFT JOIN sets pst ON pst.set_id = s.parent_set_id
       WHERE s.scheme_id = ?
-    ''', [id]);
+    ''',
+      [id],
+    );
     if (result.isEmpty) return null;
     return Scheme.fromMap(result.first);
   }
@@ -51,7 +73,10 @@ class SchemesDao {
     return getSchemeByNameAndCategory(name, 'scheme');
   }
 
-  Future<Scheme?> getSchemeByNameAndCategory(String name, String category) async {
+  Future<Scheme?> getSchemeByNameAndCategory(
+    String name,
+    String category,
+  ) async {
     final db = await _db.database;
     final result = await db.query(
       'schemes',
@@ -68,6 +93,8 @@ class SchemesDao {
     return await db.insert('schemes', {
       'scheme_name': scheme.schemeName,
       'category': scheme.category,
+      'parent_scheme_id': scheme.parentSchemeId,
+      'parent_set_id': scheme.parentSetId,
       'description': scheme.description,
       'created_at': now,
       'updated_at': now,
@@ -81,6 +108,8 @@ class SchemesDao {
       {
         'scheme_name': scheme.schemeName,
         'category': scheme.category,
+        'parent_scheme_id': scheme.parentSchemeId,
+        'parent_set_id': scheme.parentSetId,
         'description': scheme.description,
         'updated_at': _now(),
       },
@@ -91,7 +120,19 @@ class SchemesDao {
 
   Future<void> deleteScheme(int id) async {
     final db = await _db.database;
-    await db.delete('schemes', where: 'scheme_id = ?', whereArgs: [id]);
+    await db.transaction((txn) async {
+      await txn.delete(
+        'miscellaneous_items',
+        where: 'scheme_id = ?',
+        whereArgs: [id],
+      );
+      await txn.delete(
+        'schemes',
+        where: 'parent_scheme_id = ?',
+        whereArgs: [id],
+      );
+      await txn.delete('schemes', where: 'scheme_id = ?', whereArgs: [id]);
+    });
   }
 
   Future<int> getSchemeCount() async {
