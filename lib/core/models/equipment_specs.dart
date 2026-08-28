@@ -40,6 +40,9 @@ const Map<String, List<String>> _specTemplates = {
     'Rated Discharge',
     'Total Design Head (Feet)',
     'Rated Speed (RPM)',
+    'Suction Pipe Size (Inches)',
+    'Delivery Pipe Size (Inches)',
+    'Pump Depth (Feet)',
     'Other Turbine Specifications',
   ],
 };
