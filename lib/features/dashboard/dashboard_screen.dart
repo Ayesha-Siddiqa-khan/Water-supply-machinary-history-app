@@ -716,17 +716,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(entry.schemeName ?? '-',
+                      Text(entry.schemeName ?? '',
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
                           overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 2),
-                      Text('${entry.setLabel ?? '-'} · ${entry.entryDate}',
+                      Text('${entry.setLabel ?? ''} · ${entry.entryDate}',
                           style: const TextStyle(color: Colors.white54, fontSize: 10)),
                     ],
                   ),
                 ),
                 Expanded(
-                  child: Text('#${entry.voucherNo ?? '-'}',
+                  child: Text('#${entry.voucherNo ?? ''}',
                       style: const TextStyle(color: Colors.white70, fontSize: 11)),
                 ),
                 Expanded(

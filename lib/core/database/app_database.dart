@@ -26,7 +26,7 @@ class AppDatabase {
 
     return await openDatabase(
       path,
-      version: 13,
+      version: 18,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
       onConfigure: (db) async {
@@ -44,6 +44,7 @@ class AppDatabase {
         parent_scheme_id INTEGER,
         parent_set_id INTEGER,
         description TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (parent_scheme_id) REFERENCES schemes (scheme_id) ON DELETE SET NULL,
@@ -130,6 +131,8 @@ class AppDatabase {
     ''');
 
     await _createMiscTables(db);
+    await _createMiscCategoriesTable(db);
+    await _seedDefaultMiscCategories(db);
 
     // Insert default machinery types
     await _insertDefaultTypes(db);
@@ -364,6 +367,54 @@ class AppDatabase {
         'CREATE INDEX IF NOT EXISTS idx_miscellaneous_items_set_id ON miscellaneous_items(set_id)',
       );
     }
+
+    if (oldVersion < 14) {
+      await _addColumnIfMissing(db, 'schemes', 'sort_order', 'INTEGER NOT NULL DEFAULT 0');
+      // Backfill: assign sort_order = row number alphabetically so existing schemes have a sensible default
+      await db.rawUpdate('''
+        UPDATE schemes SET sort_order = (
+          SELECT COUNT(*) FROM schemes AS s2
+          WHERE s2.scheme_name < schemes.scheme_name
+            OR (s2.scheme_name = schemes.scheme_name AND s2.scheme_id < schemes.scheme_id)
+        )
+      ''');
+    }
+
+    if (oldVersion < 15) {
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'description', 'TEXT');
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'location_type', "TEXT NOT NULL DEFAULT 'scheme'");
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'location_name', 'TEXT');
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'location_address', 'TEXT');
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'location_description', 'TEXT');
+    }
+
+    if (oldVersion < 16) {
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'date', 'TEXT');
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'amount', "REAL NOT NULL DEFAULT 0");
+      // Backfill date from created_at, amount from entries sum
+      await db.rawUpdate('''
+        UPDATE miscellaneous_items SET
+          date = created_at,
+          amount = COALESCE((
+            SELECT SUM(me.amount) FROM miscellaneous_entries me
+            WHERE me.item_id = miscellaneous_items.item_id
+          ), 0)
+        WHERE date IS NULL OR date = ''
+      ''');
+    }
+
+    if (oldVersion < 17) {
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'work_order_no', 'TEXT');
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'voucher_no', 'TEXT');
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'reg_page_no', 'TEXT');
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'notes', 'TEXT');
+      await _addColumnIfMissing(db, 'miscellaneous_items', 'category_data', 'TEXT');
+    }
+
+    if (oldVersion < 18) {
+      await _createMiscCategoriesTable(db);
+      await _seedDefaultMiscCategories(db);
+    }
   }
 
   Future<void> _addColumnIfMissing(
@@ -379,6 +430,50 @@ class AppDatabase {
     }
   }
 
+  Future<void> _createMiscCategoriesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS misc_categories (
+        category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon_name TEXT NOT NULL,
+        color_value INTEGER NOT NULL,
+        description TEXT,
+        custom_fields TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _seedDefaultMiscCategories(Database db) async {
+    final existing = await db.query('misc_categories', limit: 1);
+    if (existing.isNotEmpty) return;
+    final now = _nowFormatted();
+    const defaults = [
+      ('Leakage', 'water_drop_outlined', 0xFFE53935, 'Leakage related issues and repairs'),
+      ('Sluice Valves', 'power_outlined', 0xFF1E88E5, 'Sluice valve operations and maintenance'),
+      ('Electrical', 'electrical_services_outlined', 0xFFFDD835, 'Electrical equipment and installations'),
+      ('Spare Motor', 'settings_outlined', 0xFF43A047, 'Spare motor inventory and tracking'),
+      ('Spare Transformer', 'bolt_outlined', 0xFF8E24AA, 'Spare transformer inventory and tracking'),
+      ('Emergency Engine / Emergency Light', 'engineering_outlined', 0xFFD81B60, 'Emergency equipment'),
+      ('Bleaching Powder', 'science_outlined', 0xFF00ACC1, 'Bleaching powder inventory'),
+      ('Other', 'category_outlined', 0xFF6D4C41, 'Other miscellaneous items'),
+    ];
+    for (int i = 0; i < defaults.length; i++) {
+      final (name, icon, color, desc) = defaults[i];
+      await db.insert('misc_categories', {
+        'name': name,
+        'icon_name': icon,
+        'color_value': color,
+        'description': desc,
+        'sort_order': i,
+        'created_at': now,
+        'updated_at': now,
+      });
+    }
+  }
+
   Future<void> _createMiscTables(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS miscellaneous_items (
@@ -387,6 +482,18 @@ class AppDatabase {
         set_id INTEGER,
         title TEXT NOT NULL,
         category TEXT NOT NULL,
+        description TEXT,
+        date TEXT,
+        amount REAL NOT NULL DEFAULT 0,
+        work_order_no TEXT,
+        voucher_no TEXT,
+        reg_page_no TEXT,
+        notes TEXT,
+        category_data TEXT,
+        location_type TEXT NOT NULL DEFAULT 'scheme',
+        location_name TEXT,
+        location_address TEXT,
+        location_description TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY (scheme_id) REFERENCES schemes (scheme_id) ON DELETE CASCADE,

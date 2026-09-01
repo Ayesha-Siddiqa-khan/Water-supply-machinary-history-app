@@ -27,6 +27,7 @@ class _SchemeFormState extends State<SchemeForm> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
+  final _sortOrderController = TextEditingController();
   final _schemesDao = SchemesDao();
   final _setsDao = SetsDao();
   List<Scheme> _parentSchemes = [];
@@ -47,6 +48,9 @@ class _SchemeFormState extends State<SchemeForm> {
     if (isEditing) {
       _nameController.text = widget.scheme!.schemeName;
       _descController.text = widget.scheme!.description ?? '';
+      _sortOrderController.text = widget.scheme!.sortOrder > 0
+          ? widget.scheme!.sortOrder.toString()
+          : '';
     }
     _selectedParentSchemeId =
         widget.scheme?.parentSchemeId ?? widget.parentSchemeId;
@@ -86,6 +90,7 @@ class _SchemeFormState extends State<SchemeForm> {
             parentSchemeId: _selectedParentSchemeId,
             parentSetId: _selectedParentSetId,
             description: _descController.text.trim(),
+            sortOrder: int.tryParse(_sortOrderController.text.trim()) ?? 0,
           ),
         );
       } else {
@@ -101,6 +106,7 @@ class _SchemeFormState extends State<SchemeForm> {
             description: _descController.text.trim().isNotEmpty
                 ? _descController.text.trim()
                 : null,
+            sortOrder: int.tryParse(_sortOrderController.text.trim()) ?? 0,
             createdAt: nowStr,
             updatedAt: nowStr,
           ),
@@ -173,6 +179,18 @@ class _SchemeFormState extends State<SchemeForm> {
                   return null;
                 },
                 autofocus: true,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _sortOrderController,
+                decoration: InputDecoration(
+                  labelText: 'Display Number (Optional)',
+                  hintText: _isUselessItem
+                      ? 'e.g., 1'
+                      : 'e.g., 1, 2, 3 — controls listing order',
+                  prefixIcon: Icon(Icons.sort),
+                ),
+                keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 12),
               if (_isUselessItem) ...[
@@ -278,6 +296,7 @@ class _SchemeFormState extends State<SchemeForm> {
   void dispose() {
     _nameController.dispose();
     _descController.dispose();
+    _sortOrderController.dispose();
     super.dispose();
   }
 }

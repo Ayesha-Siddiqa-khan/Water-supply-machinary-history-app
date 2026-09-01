@@ -71,9 +71,19 @@ class ExportService {
   static const double _reportTableFontSize = 10;
   static const double _reportTableHeaderFontSize = 10;
   static const int _manualWritingRows = 6;
+  static const int _miscMinTableRows = 28;
+  static const int _miscRowsPerPage = 16;
 
   final SchemesDao _schemesDao = SchemesDao();
   final SetsDao _setsDao = SetsDao();
+
+  // ponytail: DD-MM-YYYY sort helper, replace with DateTime.parse if dates are ever normalised
+  static int _compareEntryDate(String a, String b) {
+    // Compare as YYYY-MM-DD lexicographically by rearranging DD-MM-YYYY
+    final aKey = '${a.substring(6)}${a.substring(3, 5)}${a.substring(0, 2)}';
+    final bKey = '${b.substring(6)}${b.substring(3, 5)}${b.substring(0, 2)}';
+    return aKey.compareTo(bKey);
+  }
 
   // Cached fonts for PDF rendering (supports Latin + Urdu/Arabic)
   pw.Font? _baseFont;
@@ -177,6 +187,11 @@ class ExportService {
   String _formatAmount(double amount) {
     final f = NumberFormat('#,##0', 'en_US');
     return 'PKR ${f.format(amount)}';
+  }
+
+  String _formatAmountPlain(double amount) {
+    final f = NumberFormat('#,##0', 'en_US');
+    return f.format(amount);
   }
 
   String _nowFormatted() {
@@ -403,7 +418,7 @@ class ExportService {
               final specs = specCountsByType[type] ?? const <String, int>{};
               final specRows = specs.keys.toList()..sort();
               final specText = specRows.isEmpty
-                  ? '-'
+                  ? ''
                   : specRows.map((spec) => '$spec × ${specs[spec]}').join(', ');
               return [
                 type,
@@ -488,7 +503,7 @@ class ExportService {
           entries
               .where((entry) => entry.machineryId == machinery.machineryId)
               .toList()
-            ..sort((a, b) => a.serialNo.compareTo(b.serialNo));
+            ..sort((a, b) => _compareEntryDate(a.entryDate, b.entryDate));
       entriesByMachinery[machinery.machineryId!] = machineryEntries;
       if (machineryEntries.length > maxRows) {
         maxRows = machineryEntries.length;
@@ -881,7 +896,7 @@ class ExportService {
         'Electricity Bill Reference No.',
         'Electricity Distribution Company',
       ],
-      data: [fields.map((field) => set.details[field] ?? '-').toList()],
+      data: [fields.map((field) => set.details[field] ?? '').toList()],
       headerStyle: pw.TextStyle(
         fontSize: _reportTableHeaderFontSize,
         fontWeight: pw.FontWeight.bold,
@@ -1231,11 +1246,11 @@ class ExportService {
             scheme.parentSetLabel ?? set.setLabel,
             machinery.displayLabel,
             entry.isDisabled ? 'Disabled/Closed' : 'Active',
-            entry.submittedToStoreDate ?? '-',
-            entry.transferDate ?? '-',
-            entry.transferredToScheme ?? '-',
-            entry.regPageNo ?? '-',
-            entry.remarks ?? entry.notes ?? '-',
+            entry.submittedToStoreDate ?? '',
+            entry.transferDate ?? '',
+            entry.transferredToScheme ?? '',
+            entry.regPageNo ?? '',
+            entry.remarks ?? entry.notes ?? '',
           ]);
         }
       }
@@ -1338,16 +1353,16 @@ class ExportService {
             serialNo++;
             rows.add([
               '$serialNo',
-              '-',
+              '',
               record.parentSchemeName ?? 'Unassigned Scheme',
               record.parentSetLabel ?? 'Unassigned Set',
               machinery.displayLabel,
               'In Store',
-              '-',
-              '-',
-              '-',
-              '-',
-              record.description ?? '-',
+              '',
+              '',
+              '',
+              '',
+              record.description ?? '',
             ]);
             continue;
           }
@@ -1361,11 +1376,11 @@ class ExportService {
               record.parentSetLabel ?? 'Unassigned Set',
               machinery.displayLabel,
               entry.isDisabled ? 'Damaged / Unusable' : 'In Store',
-              entry.submittedToStoreDate ?? '-',
-              entry.transferDate ?? '-',
-              entry.transferredToScheme ?? '-',
-              entry.regPageNo ?? '-',
-              entry.remarks ?? entry.notes ?? record.description ?? '-',
+              entry.submittedToStoreDate ?? '',
+              entry.transferDate ?? '',
+              entry.transferredToScheme ?? '',
+              entry.regPageNo ?? '',
+              entry.remarks ?? entry.notes ?? record.description ?? '',
             ]);
           }
         }
@@ -1552,7 +1567,7 @@ class ExportService {
             entries
                 .where((entry) => entry.machineryId == machinery.machineryId)
                 .toList()
-              ..sort((a, b) => a.serialNo.compareTo(b.serialNo));
+              ..sort((a, b) => _compareEntryDate(a.entryDate, b.entryDate));
         entriesByMachinery[machinery.machineryId!] = machineryEntries;
         if (machineryEntries.length > maxRows) {
           maxRows = machineryEntries.length;
@@ -1942,7 +1957,7 @@ class ExportService {
           if (itemId == null) continue;
           final itemEntries =
               entries.where((entry) => entry.machineryId == itemId).toList()
-                ..sort((a, b) => a.serialNo.compareTo(b.serialNo));
+                ..sort((a, b) => _compareEntryDate(a.entryDate, b.entryDate));
           entriesByMachinery[itemId] = itemEntries;
 
           final type = _normalizeType(item.machineryType);
@@ -1975,7 +1990,7 @@ class ExportService {
 
     String breakdownText(_CompleteSchemeReport report, String type) {
       final values = report.breakdown[type];
-      if (values == null || values.isEmpty) return '-';
+      if (values == null || values.isEmpty) return '';
       final labels = values.keys.toList()..sort();
       return labels.map((label) => '$label × ${values[label]}').join(', ');
     }
@@ -2053,6 +2068,31 @@ class ExportService {
       }
     }
 
+    // ── Load miscellaneous records grouped by category ──
+    final miscRecords = await _loadMiscRecords();
+    final miscGrouped = <String, List<_MiscRecordExport>>{};
+    for (final record in miscRecords) {
+      miscGrouped.putIfAbsent(record.category, () => []).add(record);
+    }
+    // Sort each category's records by date ascending
+    for (final entry in miscGrouped.entries) {
+      entry.value.sort((a, b) => a.date.compareTo(b.date));
+    }
+    final miscCategories = miscGrouped.keys.toList();
+    // Page numbers: scheme pages end at detailPages.length + 2 (0-indexed),
+    // so misc starts at detailPages.length + 3
+    final firstPageByMisc = <String, int>{};
+    var nextMiscPage = detailPages.length + 3;
+    for (final category in miscCategories) {
+      firstPageByMisc[category] = nextMiscPage;
+      final recordCount = miscGrouped[category]!.length;
+      final totalRows = math.max(
+        recordCount + _manualWritingRows,
+        _miscMinTableRows,
+      );
+      nextMiscPage += (totalRows / _miscRowsPerPage).ceil();
+    }
+
     pw.Widget pageFooter(pw.Context context) => pw.Align(
       alignment: pw.Alignment.center,
       child: pw.Text(
@@ -2089,15 +2129,24 @@ class ExportService {
               ),
               pw.SizedBox(height: 16),
               pw.TableHelper.fromTextArray(
-                headers: const ['Sr. No.', 'Scheme Name', 'Page No.'],
-                data: reports.asMap().entries.map((entry) {
-                  final report = entry.value;
-                  return [
-                    '${entry.key + 1}',
-                    report.scheme.schemeName,
-                    'Page ${firstPageByScheme[report.scheme.schemeId] ?? '-'}',
-                  ];
-                }).toList(),
+                headers: const ['Sr. No.', 'Section Name', 'Page No.'],
+                data: [
+                  ...reports.asMap().entries.map((entry) {
+                    final report = entry.value;
+                    return [
+                      '${entry.key + 1}',
+                      report.scheme.schemeName,
+                      'Page ${firstPageByScheme[report.scheme.schemeId] ?? ''}',
+                    ];
+                  }),
+                  ...miscCategories.asMap().entries.map((entry) {
+                    return [
+                      '${reports.length + entry.key + 1}',
+                      '${entry.value} Register',
+                      'Page ${firstPageByMisc[entry.value] ?? ''}',
+                    ];
+                  }),
+                ],
                 headerStyle: pw.TextStyle(
                   fontSize: 11,
                   fontWeight: pw.FontWeight.bold,
@@ -2343,6 +2392,164 @@ class ExportService {
           },
         ),
       );
+    }
+
+    // ── Miscellaneous category register pages ──
+    for (final catName in miscCategories) {
+      final catRecords = miscGrouped[catName]!;
+      final totalAmount = catRecords.fold<double>(
+        0,
+        (sum, r) => sum + r.totalAmount,
+      );
+
+      pw.Widget miscCell(
+        String text, {
+        bool bold = false,
+        double height = 27,
+        pw.TextAlign align = pw.TextAlign.center,
+      }) {
+        final hasArabic = _containsArabic(text);
+        final effectiveAlign = hasArabic ? pw.TextAlign.right : align;
+        return pw.Container(
+          height: height,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+          child: pw.Text(
+            text,
+            textAlign: effectiveAlign,
+            textDirection: hasArabic
+                ? pw.TextDirection.rtl
+                : pw.TextDirection.ltr,
+            style: pw.TextStyle(
+              fontSize: _reportTableFontSize,
+              font: hasArabic ? _arabicFont : (bold ? _boldFont : _baseFont),
+              fontBold: _boldFont,
+              fontFallback: _fontFallback ?? [],
+              color: PdfColors.black,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+        );
+      }
+
+      final totalRows = math.max(
+        catRecords.length + _manualWritingRows,
+        _miscMinTableRows,
+      );
+      for (
+        int pageStart = 0;
+        pageStart < totalRows;
+        pageStart += _miscRowsPerPage
+      ) {
+        final pageEnd = math.min(pageStart + _miscRowsPerPage, totalRows);
+        final tableRows = <pw.TableRow>[
+          pw.TableRow(
+            decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+            children: [
+              miscCell('Sr.No', bold: true, height: 32),
+              miscCell('Date', bold: true, height: 32),
+              miscCell('Title', bold: true, height: 32),
+              miscCell('Description', bold: true, height: 32),
+              miscCell('Location', bold: true, height: 32),
+              miscCell('Scheme Ref', bold: true, height: 32),
+              miscCell('Amount (PKR)', bold: true, height: 32),
+              miscCell('Voucher No.', bold: true, height: 32),
+              miscCell('W.O. No.', bold: true, height: 32),
+              miscCell('Reg. Page', bold: true, height: 32),
+              miscCell('Notes', bold: true, height: 32),
+            ],
+          ),
+        ];
+
+        for (int rowIndex = pageStart; rowIndex < pageEnd; rowIndex++) {
+          if (rowIndex >= catRecords.length) {
+            tableRows.add(
+              pw.TableRow(children: List.generate(11, (_) => miscCell(''))),
+            );
+            continue;
+          }
+
+          final record = catRecords[rowIndex];
+          tableRows.add(
+            pw.TableRow(
+              children: [
+                miscCell('${rowIndex + 1}'),
+                miscCell(record.date),
+                miscCell(record.title, align: pw.TextAlign.left),
+                miscCell(record.description ?? '', align: pw.TextAlign.left),
+                miscCell(record.location, align: pw.TextAlign.left),
+                miscCell(record.schemeRef),
+                miscCell(_formatAmountPlain(record.totalAmount)),
+                miscCell(record.voucherNo ?? ''),
+                miscCell(record.workOrderNo ?? ''),
+                miscCell(record.regPageNo ?? ''),
+                miscCell(record.notes ?? '', align: pw.TextAlign.left),
+              ],
+            ),
+          );
+        }
+
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4.landscape,
+            margin: const pw.EdgeInsets.fromLTRB(18, 14, 18, 14),
+            build: (context) => pageLayout(
+              context,
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                children: [
+                  pw.Text(
+                    pageStart == 0
+                        ? '$catName Register'
+                        : '$catName Register (continued)',
+                    textAlign: pw.TextAlign.center,
+                    style: pw.TextStyle(
+                      fontSize: 18,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        'Generated on ${_nowFormatted()}',
+                        style: const pw.TextStyle(fontSize: 10),
+                      ),
+                      pw.Text(
+                        'Total Records: ${catRecords.length}  |  Total Amount: ${_formatAmount(totalAmount)}',
+                        style: const pw.TextStyle(fontSize: 10),
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 6),
+                  pw.Divider(thickness: 1),
+                  pw.SizedBox(height: 4),
+                  pw.Table(
+                    columnWidths: {
+                      0: const pw.FixedColumnWidth(32),
+                      1: const pw.FixedColumnWidth(56),
+                      2: const pw.FixedColumnWidth(92),
+                      3: const pw.FixedColumnWidth(80),
+                      4: const pw.FixedColumnWidth(80),
+                      5: const pw.FixedColumnWidth(72),
+                      6: const pw.FixedColumnWidth(60),
+                      7: const pw.FixedColumnWidth(60),
+                      8: const pw.FixedColumnWidth(60),
+                      9: const pw.FixedColumnWidth(52),
+                      10: const pw.FixedColumnWidth(102),
+                    },
+                    border: pw.TableBorder.all(
+                      color: PdfColors.black,
+                      width: 0.65,
+                    ),
+                    children: tableRows,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
     }
 
     return pdf.save();
@@ -3183,157 +3390,201 @@ class ExportService {
 
   // ─────────────────── Miscellaneous Export ───────────────────
 
-  Future<List<_MiscRecordExport>> _loadMiscRecords({
-    String? recordId,
-    int? schemeId,
-    int? setId,
-  }) async {
-    final rawRecords = await _miscDao.getAllRecords(
-      schemeId: schemeId,
-      setId: setId,
-    );
-    final all = rawRecords
+  Future<List<_MiscRecordExport>> _loadMiscRecords({String? category}) async {
+    final rawRecords = await _miscDao.getAllRecords(category: category);
+    return rawRecords
         .map((e) => _MiscRecordExport.fromJson(Map<String, dynamic>.from(e)))
         .toList();
-    if (recordId == null || recordId.trim().isEmpty) return all;
-    return all.where((r) => r.id == recordId).toList();
   }
 
-  Future<Uint8List> exportMiscellaneousToPdf({
-    String? recordId,
-    int? schemeId,
-    int? setId,
-  }) async {
+  Future<Uint8List> exportMiscellaneousToPdf({String? category}) async {
     await _ensureFontsLoaded();
-    final records = await _loadMiscRecords(
-      recordId: recordId,
-      schemeId: schemeId,
-      setId: setId,
-    );
+    final records = await _loadMiscRecords(category: category);
     if (records.isEmpty) {
       throw Exception('No miscellaneous data found to export');
     }
 
-    final pdf = pw.Document(theme: _pdfTheme());
-    final totalEntries = records.fold<int>(
-      0,
-      (sum, r) => sum + r.entries.length,
-    );
-    final totalAmount = records.fold<double>(
-      0,
-      (sum, r) => sum + r.totalAmount,
-    );
+    // Group records by category
+    final grouped = <String, List<_MiscRecordExport>>{};
+    for (final record in records) {
+      grouped.putIfAbsent(record.category, () => []).add(record);
+    }
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4.landscape,
-        margin: const pw.EdgeInsets.all(18),
-        footer: (context) => pw.Container(
-          width: double.infinity,
-          alignment: pw.Alignment.center,
-          child: pw.Text(
-            'Page ${context.pageNumber}',
-            style: const pw.TextStyle(fontSize: 10),
+    pw.Widget cell(
+      String text, {
+      bool bold = false,
+      double height = 27,
+      pw.TextAlign align = pw.TextAlign.center,
+    }) {
+      final hasArabic = _containsArabic(text);
+      final effectiveAlign = hasArabic ? pw.TextAlign.right : align;
+      return pw.Container(
+        height: height,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        child: pw.Text(
+          text,
+          textAlign: effectiveAlign,
+          textDirection: hasArabic
+              ? pw.TextDirection.rtl
+              : pw.TextDirection.ltr,
+          style: pw.TextStyle(
+            fontSize: _reportTableFontSize,
+            font: hasArabic ? _arabicFont : (bold ? _boldFont : _baseFont),
+            fontBold: _boldFont,
+            fontFallback: _fontFallback ?? [],
+            color: PdfColors.black,
+            fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
           ),
         ),
-        build: (context) => [
-          pw.Text(
-            'Miscellaneous Expenditure Report',
-            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            'Generated on ${_nowFormatted()}',
-            style: const pw.TextStyle(fontSize: 10),
-          ),
-          pw.SizedBox(height: 8),
-          pw.Text(
-            'Total Items: ${records.length} | Total Entries: $totalEntries | Total Amount: ${_formatAmount(totalAmount)}',
-            style: const pw.TextStyle(fontSize: 12),
-          ),
-          pw.SizedBox(height: 12),
-          ...records.map((record) {
-            final rows = record.entries
-                .asMap()
-                .entries
-                .map(
-                  (entry) => [
-                    '${entry.key + 1}',
-                    entry.value.entryDate,
-                    entry.value.workOrderNo ?? '-',
-                    entry.value.voucherNo ?? '-',
-                    _formatAmount(entry.value.amount),
-                    entry.value.regPageNo ?? '-',
-                  ],
-                )
-                .toList();
-            rows.addAll(
-              List.generate(
-                _manualWritingRows,
-                (_) => List<String>.filled(6, ''),
-              ),
-            );
+      );
+    }
 
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Container(
-                  width: double.infinity,
-                  padding: const pw.EdgeInsets.all(6),
-                  decoration: pw.BoxDecoration(),
-                  child: pw.Text(
-                    '${record.title} (${record.category}) | Scheme: ${record.schemeName ?? 'Unassigned'} | Set: ${record.setLabel ?? 'Unassigned'} | Entries: ${record.entries.length} | Total: ${_formatAmount(record.totalAmount)}',
-                    style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                pw.TableHelper.fromTextArray(
-                  headerStyle: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.black,
-                    fontSize: _reportTableHeaderFontSize,
-                    fontFallback: _fontFallback ?? [],
-                  ),
-                  headerDecoration: const pw.BoxDecoration(),
-                  cellStyle: pw.TextStyle(
-                    fontSize: _reportTableFontSize,
-                    fontFallback: _fontFallback ?? [],
-                  ),
-                  cellAlignment: pw.Alignment.center,
-                  headerAlignment: pw.Alignment.center,
-                  headers: const [
-                    'Sr.No',
-                    'Date',
-                    'W.O. No.',
-                    'Voucher No.',
-                    'Amount (PKR)',
-                    'Reg. Page No.',
-                  ],
-                  data: rows,
-                ),
-                pw.SizedBox(height: 10),
-              ],
+    final pdf = pw.Document(theme: _pdfTheme());
+
+    for (final entry in grouped.entries) {
+      final catName = entry.key;
+      final catRecords = entry.value;
+      final totalAmount = catRecords.fold<double>(
+        0,
+        (sum, r) => sum + r.totalAmount,
+      );
+
+      final totalRows = math.max(
+        catRecords.length + _manualWritingRows,
+        _miscMinTableRows,
+      );
+      for (
+        int pageStart = 0;
+        pageStart < totalRows;
+        pageStart += _miscRowsPerPage
+      ) {
+        final pageEnd = math.min(pageStart + _miscRowsPerPage, totalRows);
+        final tableRows = <pw.TableRow>[
+          pw.TableRow(
+            decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+            children: [
+              cell('Sr.No', bold: true, height: 32),
+              cell('Date', bold: true, height: 32),
+              cell('Title', bold: true, height: 32),
+              cell('Description', bold: true, height: 32),
+              cell('Location', bold: true, height: 32),
+              cell('Scheme Ref', bold: true, height: 32),
+              cell('Amount (PKR)', bold: true, height: 32),
+              cell('Voucher No.', bold: true, height: 32),
+              cell('W.O. No.', bold: true, height: 32),
+              cell('Reg. Page', bold: true, height: 32),
+              cell('Notes', bold: true, height: 32),
+            ],
+          ),
+        ];
+
+        for (int rowIndex = pageStart; rowIndex < pageEnd; rowIndex++) {
+          if (rowIndex >= catRecords.length) {
+            tableRows.add(
+              pw.TableRow(children: List.generate(11, (_) => cell(''))),
             );
-          }),
-        ],
-      ),
-    );
+            continue;
+          }
+
+          final record = catRecords[rowIndex];
+          tableRows.add(
+            pw.TableRow(
+              children: [
+                cell('${rowIndex + 1}'),
+                cell(record.date),
+                cell(record.title, align: pw.TextAlign.left),
+                cell(record.description ?? '', align: pw.TextAlign.left),
+                cell(record.location, align: pw.TextAlign.left),
+                cell(record.schemeRef),
+                cell(_formatAmountPlain(record.totalAmount)),
+                cell(record.voucherNo ?? ''),
+                cell(record.workOrderNo ?? ''),
+                cell(record.regPageNo ?? ''),
+                cell(record.notes ?? '', align: pw.TextAlign.left),
+              ],
+            ),
+          );
+        }
+
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4.landscape,
+            margin: const pw.EdgeInsets.fromLTRB(18, 14, 18, 14),
+            build: (context) => pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+              children: [
+                pw.Expanded(
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                    children: [
+                      pw.Text(
+                        pageStart == 0
+                            ? '$catName Register'
+                            : '$catName Register (continued)',
+                        textAlign: pw.TextAlign.center,
+                        style: pw.TextStyle(
+                          fontSize: 18,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text(
+                            'Generated on ${_nowFormatted()}',
+                            style: const pw.TextStyle(fontSize: 10),
+                          ),
+                          pw.Text(
+                            'Total Records: ${catRecords.length}  |  Total Amount: ${_formatAmount(totalAmount)}',
+                            style: const pw.TextStyle(fontSize: 10),
+                          ),
+                        ],
+                      ),
+                      pw.SizedBox(height: 6),
+                      pw.Divider(thickness: 1),
+                      pw.SizedBox(height: 4),
+                      pw.Table(
+                        columnWidths: {
+                          0: const pw.FixedColumnWidth(32),
+                          1: const pw.FixedColumnWidth(56),
+                          2: const pw.FixedColumnWidth(92),
+                          3: const pw.FixedColumnWidth(80),
+                          4: const pw.FixedColumnWidth(80),
+                          5: const pw.FixedColumnWidth(72),
+                          6: const pw.FixedColumnWidth(60),
+                          7: const pw.FixedColumnWidth(60),
+                          8: const pw.FixedColumnWidth(60),
+                          9: const pw.FixedColumnWidth(52),
+                          10: const pw.FixedColumnWidth(102),
+                        },
+                        border: pw.TableBorder.all(
+                          color: PdfColors.black,
+                          width: 0.65,
+                        ),
+                        children: tableRows,
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  'Page ${context.pageNumber}',
+                  textAlign: pw.TextAlign.center,
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
 
     return pdf.save();
   }
 
-  Future<String> exportMiscellaneousToExcel({
-    String? recordId,
-    int? schemeId,
-    int? setId,
-  }) async {
-    final records = await _loadMiscRecords(
-      recordId: recordId,
-      schemeId: schemeId,
-      setId: setId,
-    );
+  Future<String> exportMiscellaneousToExcel({String? category}) async {
+    final records = await _loadMiscRecords(category: category);
     if (records.isEmpty) {
       throw Exception('No miscellaneous data found to export');
     }
@@ -3343,13 +3594,15 @@ class ExportService {
     final headers = [
       'Title',
       'Category',
-      'Sr.No',
       'Date',
-      'W.O. No.',
-      'Voucher No.',
+      'Description',
+      'Location',
+      'Scheme Ref',
       'Amount (PKR)',
+      'Voucher No.',
+      'W.O. No.',
       'Reg. Page No.',
-      'Scheme',
+      'Notes',
     ];
 
     for (int i = 0; i < headers.length; i++) {
@@ -3366,75 +3619,62 @@ class ExportService {
 
     int row = 1;
     for (final record in records) {
-      if (record.entries.isEmpty) {
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
-            .value = xl.TextCellValue(
-          record.title,
-        );
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-            .value = xl.TextCellValue(
-          record.category,
-        );
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row))
-            .value = xl.TextCellValue(
-          record.schemeName ?? 'Unassigned',
-        );
-        row++;
-        continue;
-      }
-
-      for (int i = 0; i < record.entries.length; i++) {
-        final e = record.entries[i];
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
-            .value = xl.TextCellValue(
-          record.title,
-        );
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
-            .value = xl.TextCellValue(
-          record.category,
-        );
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
-            .value = xl.IntCellValue(
-          i + 1,
-        );
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row))
-            .value = xl.TextCellValue(
-          e.entryDate,
-        );
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row))
-            .value = xl.TextCellValue(
-          e.workOrderNo ?? '',
-        );
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row))
-            .value = xl.TextCellValue(
-          e.voucherNo ?? '',
-        );
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row))
-            .value = xl.DoubleCellValue(
-          e.amount,
-        );
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row))
-            .value = xl.TextCellValue(
-          e.regPageNo ?? '',
-        );
-        sheet
-            .cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row))
-            .value = xl.TextCellValue(
-          record.schemeName ?? 'Unassigned',
-        );
-        row++;
-      }
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+          .value = xl.TextCellValue(
+        record.title,
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: row))
+          .value = xl.TextCellValue(
+        record.category,
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
+          .value = xl.TextCellValue(
+        record.date,
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row))
+          .value = xl.TextCellValue(
+        record.description ?? '',
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row))
+          .value = xl.TextCellValue(
+        record.location,
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row))
+          .value = xl.TextCellValue(
+        record.schemeRef,
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row))
+          .value = xl.DoubleCellValue(
+        record.totalAmount,
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row))
+          .value = xl.TextCellValue(
+        record.voucherNo ?? '',
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row))
+          .value = xl.TextCellValue(
+        record.workOrderNo ?? '',
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: row))
+          .value = xl.TextCellValue(
+        record.regPageNo ?? '',
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 10, rowIndex: row))
+          .value = xl.TextCellValue(
+        record.notes ?? '',
+      );
+      row++;
     }
 
     if (excel.tables.containsKey('Sheet1')) {
@@ -3448,16 +3688,8 @@ class ExportService {
     return file.path;
   }
 
-  Future<String> exportMiscellaneousToCsv({
-    String? recordId,
-    int? schemeId,
-    int? setId,
-  }) async {
-    final records = await _loadMiscRecords(
-      recordId: recordId,
-      schemeId: schemeId,
-      setId: setId,
-    );
+  Future<String> exportMiscellaneousToCsv({String? category}) async {
+    final records = await _loadMiscRecords(category: category);
     if (records.isEmpty) {
       throw Exception('No miscellaneous data found to export');
     }
@@ -3465,27 +3697,166 @@ class ExportService {
     final buffer = StringBuffer();
     buffer.write('\uFEFF');
     buffer.writeln(
-      'Title,Category,Sr.No,Date,W.O. No.,Voucher No.,Amount (PKR),Reg. Page No.,Scheme',
+      'Title,Category,Date,Description,Location,Scheme Ref,Amount (PKR),Voucher No.,W.O. No.,Reg. Page No.,Notes',
     );
 
     for (final record in records) {
-      if (record.entries.isEmpty) {
-        buffer.writeln(
-          '"${record.title}","${record.category}",,,,,,,"${record.schemeName ?? 'Unassigned'}"',
-        );
-        continue;
-      }
-
-      for (int i = 0; i < record.entries.length; i++) {
-        final e = record.entries[i];
-        buffer.writeln(
-          '"${record.title}","${record.category}",${i + 1},"${e.entryDate}","${e.workOrderNo ?? ''}","${e.voucherNo ?? ''}",${e.amount},"${e.regPageNo ?? ''}","${record.schemeName ?? 'Unassigned'}"',
-        );
-      }
+      buffer.writeln(
+        '"${record.title}","${record.category}","${record.date}","${record.description ?? ''}","${record.location}","${record.schemeRef}",${record.totalAmount},"${record.voucherNo ?? ''}","${record.workOrderNo ?? ''}","${record.regPageNo ?? ''}","${record.notes ?? ''}"',
+      );
     }
 
     final dir = await getApplicationDocumentsDirectory();
     final filename = 'Miscellaneous_Export.csv';
+    final file = File('${dir.path}/$filename');
+    await file.writeAsString(buffer.toString());
+    return file.path;
+  }
+
+  // ─────────────────── Useless Items Complete Export ───────────────────
+
+  Future<Uint8List> exportAllUselessItemsToPdf({String? headerText}) async {
+    await _ensureFontsLoaded();
+    final schemes = await _schemesDao.getSchemesByCategory('useless_item');
+    if (schemes.isEmpty) {
+      throw Exception('No useless items found to export');
+    }
+
+    final pdf = pw.Document(theme: _pdfTheme());
+    final header = (headerText != null && headerText.isNotEmpty)
+        ? headerText
+        : 'Water Supply Scheme - Useless Items Report';
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(18),
+        footer: (context) => pw.Container(
+          width: double.infinity,
+          alignment: pw.Alignment.center,
+          child: pw.Text(
+            'Page ${context.pageNumber}',
+            style: const pw.TextStyle(fontSize: 10),
+          ),
+        ),
+        build: (context) => [
+          pw.Text(
+            header,
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'Useless Items Report | Generated on ${_nowFormatted()}',
+            style: const pw.TextStyle(fontSize: 10),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            'Total Categories: ${schemes.length}',
+            style: const pw.TextStyle(fontSize: 12),
+          ),
+          pw.SizedBox(height: 12),
+          ...schemes.map((scheme) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.all(6),
+                  decoration: pw.BoxDecoration(color: PdfColors.grey100),
+                  child: pw.Text(
+                    '${scheme.schemeName} (${scheme.category})',
+                    style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  scheme.description ?? 'No description',
+                  style: const pw.TextStyle(fontSize: 10),
+                ),
+                pw.SizedBox(height: 10),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  Future<String> exportAllUselessItemsToExcel() async {
+    final schemes = await _schemesDao.getSchemesByCategory('useless_item');
+    if (schemes.isEmpty) {
+      throw Exception('No useless items found to export');
+    }
+
+    final excel = xl.Excel.createExcel();
+    final sheet = excel['Useless Items'];
+    final headers = ['Scheme Name', 'Category', 'Description'];
+
+    for (int i = 0; i < headers.length; i++) {
+      final cell = sheet.cell(
+        xl.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+      );
+      cell.value = xl.TextCellValue(headers[i]);
+      cell.cellStyle = xl.CellStyle(
+        bold: true,
+        backgroundColorHex: xl.ExcelColor.fromHexString('#1E3A5F'),
+        fontColorHex: xl.ExcelColor.fromHexString('#FFFFFF'),
+      );
+    }
+
+    for (int i = 0; i < schemes.length; i++) {
+      final s = schemes[i];
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: i + 1))
+          .value = xl.TextCellValue(
+        s.schemeName,
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: i + 1))
+          .value = xl.TextCellValue(
+        s.category,
+      );
+      sheet
+          .cell(xl.CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: i + 1))
+          .value = xl.TextCellValue(
+        s.description ?? '',
+      );
+    }
+
+    if (excel.tables.containsKey('Sheet1')) {
+      excel.delete('Sheet1');
+    }
+
+    final dir = await getApplicationDocumentsDirectory();
+    final filename = 'Useless_Items_Export.xlsx';
+    final file = File('${dir.path}/$filename');
+    await file.writeAsBytes(excel.encode()!);
+    return file.path;
+  }
+
+  Future<String> exportAllUselessItemsToCsv() async {
+    final schemes = await _schemesDao.getSchemesByCategory('useless_item');
+    if (schemes.isEmpty) {
+      throw Exception('No useless items found to export');
+    }
+
+    final buffer = StringBuffer();
+    buffer.write('\uFEFF');
+    buffer.writeln('Scheme Name,Category,Description');
+
+    for (final s in schemes) {
+      buffer.writeln(
+        '"${s.schemeName}","${s.category}","${(s.description ?? '').replaceAll('"', '""')}"',
+      );
+    }
+
+    final dir = await getApplicationDocumentsDirectory();
+    final filename = 'Useless_Items_Export.csv';
     final file = File('${dir.path}/$filename');
     await file.writeAsString(buffer.toString());
     return file.path;
@@ -3503,28 +3874,80 @@ class _MiscRecordExport {
   final String id;
   final String title;
   final String category;
+  final String? description;
+  final String date;
+  final double amount;
+  final String? workOrderNo;
+  final String? voucherNo;
+  final String? regPageNo;
+  final String? notes;
   final String? schemeName;
   final String? setLabel;
+  final String? locationType;
+  final String? locationName;
+  final String? locationAddress;
   final List<_MiscEntryExport> entries;
 
   _MiscRecordExport({
     required this.id,
     required this.title,
     required this.category,
+    this.description,
+    this.date = '',
+    this.amount = 0,
+    this.workOrderNo,
+    this.voucherNo,
+    this.regPageNo,
+    this.notes,
     this.schemeName,
     this.setLabel,
+    this.locationType,
+    this.locationName,
+    this.locationAddress,
     required this.entries,
   });
 
-  double get totalAmount => entries.fold<double>(0, (sum, e) => sum + e.amount);
+  double get totalAmount =>
+      amount > 0 ? amount : entries.fold<double>(0, (sum, e) => sum + e.amount);
+
+  String get schemeRef {
+    if (locationType == 'scheme') {
+      final parts = [
+        schemeName,
+        setLabel,
+      ].where((e) => e != null && e.isNotEmpty).toList();
+      return parts.join(' - ');
+    }
+    return '';
+  }
+
+  String get location {
+    if (locationType == 'external') {
+      return [
+        locationName,
+        locationAddress,
+      ].where((e) => e != null && e.isNotEmpty).join(', ');
+    }
+    return '';
+  }
 
   factory _MiscRecordExport.fromJson(Map<String, dynamic> json) {
     return _MiscRecordExport(
       id: (json['id'] ?? '').toString(),
       title: (json['title'] ?? '').toString(),
       category: (json['category'] ?? 'Miscellaneous').toString(),
+      description: json['description']?.toString(),
+      date: (json['date'] ?? '').toString(),
+      amount: double.tryParse((json['amount'] ?? 0).toString()) ?? 0,
+      workOrderNo: json['workOrderNo']?.toString(),
+      voucherNo: json['voucherNo']?.toString(),
+      regPageNo: json['regPageNo']?.toString(),
+      notes: json['notes']?.toString(),
       schemeName: json['schemeName']?.toString(),
       setLabel: json['setLabel']?.toString(),
+      locationType: (json['locationType'] ?? 'scheme').toString(),
+      locationName: json['locationName']?.toString(),
+      locationAddress: json['locationAddress']?.toString(),
       entries: (json['entries'] is List)
           ? (json['entries'] as List)
                 .whereType<Map>()

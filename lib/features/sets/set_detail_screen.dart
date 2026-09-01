@@ -579,6 +579,7 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
 
                         // Set information (location, electricity bill, company)
                         Card(
+                          color: const Color(0xFFFFF3E0),
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(16, 8, 8, 12),
                             child: Column(
@@ -648,6 +649,7 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      color: _machinerySectionColor(machinery.machineryType),
       child: ExpansionTile(
         initiallyExpanded: true,
         leading: _getMachineryIcon(machinery.machineryType),
@@ -852,23 +854,23 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
                         cells: [
                           DataCell(Text('${e.serialNo}')),
                           if (!isUseless) DataCell(Text(e.entryDate)),
-                          if (!isUseless) DataCell(Text(e.workOrderNo ?? '-')),
+                          if (!isUseless) DataCell(Text(e.workOrderNo ?? '')),
                           if (!isUseless)
-                            DataCell(Text(e.voucherNo?.toString() ?? '-')),
+                            DataCell(Text(e.voucherNo?.toString() ?? '')),
                           if (!isUseless)
                             DataCell(
                               Text(CurrencyUtils.formatAmount(e.amount)),
                             ),
-                          DataCell(Text(e.regPageNo ?? '-')),
+                          DataCell(Text(e.regPageNo ?? '')),
                           if (isUseless)
                             DataCell(Text(e.isDisabled ? 'Yes' : 'No')),
                           if (isUseless)
-                            DataCell(Text(e.submittedToStoreDate ?? '-')),
-                          if (isUseless) DataCell(Text(e.transferDate ?? '-')),
+                            DataCell(Text(e.submittedToStoreDate ?? '')),
+                          if (isUseless) DataCell(Text(e.transferDate ?? '')),
                           if (isUseless)
-                            DataCell(Text(e.transferredToScheme ?? '-')),
+                            DataCell(Text(e.transferredToScheme ?? '')),
                           if (isUseless)
-                            DataCell(Text(e.remarks ?? e.notes ?? '-')),
+                            DataCell(Text(e.remarks ?? e.notes ?? '')),
                           DataCell(
                             Row(
                               mainAxisSize: MainAxisSize.min,
@@ -917,6 +919,23 @@ class _SetDetailScreenState extends State<SetDetailScreen> {
         ],
       ),
     );
+  }
+
+  static Color _machinerySectionColor(String type) {
+    switch (type.toLowerCase()) {
+      case 'motor':
+        return const Color(0xFFE3F2FD);
+      case 'pump':
+        return const Color(0xFFE8F5E9);
+      case 'transformer':
+        return const Color(0xFFFFF8E1);
+      case 'electrical items':
+        return const Color(0xFFEDE7F6);
+      case 'turbine':
+        return const Color(0xFFF3E5F5);
+      default:
+        return const Color(0xFFF5F5F5);
+    }
   }
 
   Widget _getMachineryIcon(String type) {

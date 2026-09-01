@@ -38,6 +38,7 @@ class _SchemesListScreenState extends State<SchemesListScreen> {
   List<Scheme> _schemes = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  bool _isReorderMode = false;
 
   @override
   void initState() {
@@ -139,13 +140,19 @@ class _SchemesListScreenState extends State<SchemesListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isCompact = MediaQuery.of(context).size.width < 600;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
-          if (widget.appBarActions != null) ...widget.appBarActions!,
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadSchemes),
+          if (_isReorderMode)
+            TextButton(
+              onPressed: () => setState(() => _isReorderMode = false),
+              child: const Text('Done', style: TextStyle(color: Colors.white)),
+            )
+          else ...[
+            if (widget.appBarActions != null) ...widget.appBarActions!,
+            IconButton(icon: const Icon(Icons.refresh), onPressed: _loadSchemes),
+          ],
         ],
       ),
       body: _isLoading
@@ -183,262 +190,278 @@ class _SchemesListScreenState extends State<SchemesListScreen> {
             )
           : RefreshIndicator(
               onRefresh: _loadSchemes,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _filteredSchemes.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: TextField(
-                        decoration: const InputDecoration(
-                          hintText: 'Search by item or scheme name...',
-                          prefixIcon: Icon(Icons.search),
-                        ),
-                        onChanged: (value) =>
-                            setState(() => _searchQuery = value.trim()),
-                      ),
-                    );
-                  }
-                  final scheme = _filteredSchemes[index - 1];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                SchemeDetailScreen(schemeId: scheme.schemeId!),
-                          ),
-                        );
-                        _loadSchemes();
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: isCompact
-                            ? Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary.withOpacity(
-                                            0.1,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            10,
-                                          ),
-                                        ),
-                                        child: const Icon(
-                                          Icons.water_drop,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          scheme.schemeName,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.titleLarge,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                      PopupMenuButton<String>(
-                                        onSelected: (value) {
-                                          if (value == 'edit')
-                                            _editScheme(scheme);
-                                          if (value == 'delete')
-                                            _deleteScheme(scheme);
-                                        },
-                                        itemBuilder: (ctx) => [
-                                          PopupMenuItem(
-                                            value: 'edit',
-                                            child: Text(
-                                              AppLocalizations.of(
-                                                ctx,
-                                              )!.commonEdit,
-                                            ),
-                                          ),
-                                          PopupMenuItem(
-                                            value: 'delete',
-                                            child: Text(
-                                              AppLocalizations.of(
-                                                ctx,
-                                              )!.commonDelete,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 12,
-                                    runSpacing: 6,
-                                    children: [
-                                      _InfoChip(
-                                        icon: Icons.settings,
-                                        label: AppLocalizations.of(
-                                          context,
-                                        )!.schemeSetsCount(scheme.setCount),
-                                      ),
-                                      _InfoChip(
-                                        icon: Icons.payments_outlined,
-                                        label: CurrencyUtils.formatAmountShort(
-                                          scheme.totalAmount,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (scheme.description != null &&
-                                      scheme.description!.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 6),
-                                      child: Text(
-                                        scheme.description!,
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.bodySmall,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  if (scheme.parentSchemeName != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 6),
-                                      child: Text(
-                                        'Scheme: ${scheme.parentSchemeName}'
-                                        '${scheme.parentSetLabel == null ? '' : ' • Set: ${scheme.parentSetLabel}'}',
-                                        style: const TextStyle(
-                                          color: AppColors.primary,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              )
-                            : Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: const Icon(
-                                      Icons.water_drop,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          scheme.schemeName,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.titleLarge,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            _InfoChip(
-                                              icon: Icons.settings,
-                                              label:
-                                                  AppLocalizations.of(
-                                                    context,
-                                                  )!.schemeSetsCount(
-                                                    scheme.setCount,
-                                                  ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            _InfoChip(
-                                              icon: Icons.payments_outlined,
-                                              label:
-                                                  CurrencyUtils.formatAmountShort(
-                                                    scheme.totalAmount,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                        if (scheme.description != null &&
-                                            scheme.description!.isNotEmpty)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 4,
-                                            ),
-                                            child: Text(
-                                              scheme.description!,
-                                              style: Theme.of(
-                                                context,
-                                              ).textTheme.bodySmall,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        if (scheme.parentSchemeName != null)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: 4,
-                                            ),
-                                            child: Text(
-                                              'Scheme: ${scheme.parentSchemeName}'
-                                              '${scheme.parentSetLabel == null ? '' : ' • Set: ${scheme.parentSetLabel}'}',
-                                              style: const TextStyle(
-                                                color: AppColors.primary,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuButton<String>(
-                                    onSelected: (value) {
-                                      if (value == 'edit') _editScheme(scheme);
-                                      if (value == 'delete')
-                                        _deleteScheme(scheme);
-                                    },
-                                    itemBuilder: (ctx) => [
-                                      PopupMenuItem(
-                                        value: 'edit',
-                                        child: Text(
-                                          AppLocalizations.of(ctx)!.commonEdit,
-                                        ),
-                                      ),
-                                      PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text(
-                                          AppLocalizations.of(
-                                            ctx,
-                                          )!.commonDelete,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                  );
-                },
-              ),
+              child: _isReorderMode ? _buildReorderList() : _buildNormalList(),
             ),
-      floatingActionButton: _schemes.isNotEmpty
+      floatingActionButton: _schemes.isNotEmpty && !_isReorderMode
           ? FloatingActionButton(
               onPressed: _addScheme,
               child: const Icon(Icons.add),
             )
           : null,
     );
+  }
+
+  Widget _buildNormalList() {
+    final schemes = _filteredSchemes;
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: schemes.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: TextField(
+              decoration: const InputDecoration(
+                hintText: 'Search by item or scheme name...',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (value) =>
+                  setState(() => _searchQuery = value.trim()),
+            ),
+          );
+        }
+        final scheme = schemes[index - 1];
+        final displayIndex = index;
+        return _buildSchemeCard(scheme, displayIndex);
+      },
+    );
+  }
+
+  Widget _buildReorderList() {
+    return ReorderableListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _schemes.length,
+      onReorder: _onReorder,
+      itemBuilder: (context, index) {
+        final scheme = _schemes[index];
+        return _buildSchemeCard(scheme, index + 1, isReorderable: true);
+      },
+    );
+  }
+
+  Future<void> _onReorder(int oldIndex, int newIndex) async {
+    setState(() {
+      if (oldIndex < newIndex) newIndex -= 1;
+      final item = _schemes.removeAt(oldIndex);
+      _schemes.insert(newIndex, item);
+    });
+    // Persist the new order
+    await _schemesDao.reorderSchemes(_schemes.map((s) => s.schemeId!).toList());
+  }
+
+  Widget _buildSchemeCard(Scheme scheme, int displayIndex,
+      {bool isReorderable = false}) {
+    final isCompact = MediaQuery.of(context).size.width < 600;
+    final prefix = displayIndex.toString().padLeft(2, '0');
+    return Card(
+      key: ValueKey(scheme.schemeId),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: isReorderable
+            ? null
+            : () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        SchemeDetailScreen(schemeId: scheme.schemeId!),
+                  ),
+                );
+                _loadSchemes();
+              },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: isCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (isReorderable)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: Icon(Icons.drag_handle, color: AppColors.textHint),
+                          ),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.water_drop,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            '$prefix. ${scheme.schemeName}',
+                            style: Theme.of(context).textTheme.titleLarge,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (!isReorderable)
+                          PopupMenuButton<String>(
+                            onSelected: (value) {
+                              if (value == 'edit') _editScheme(scheme);
+                              if (value == 'delete') _deleteScheme(scheme);
+                              if (value == 'reorder') _enterReorderMode();
+                            },
+                            itemBuilder: (ctx) => [
+                              PopupMenuItem(
+                                value: 'edit',
+                                child: Text(AppLocalizations.of(ctx)!.commonEdit),
+                              ),
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Text(AppLocalizations.of(ctx)!.commonDelete),
+                              ),
+                              const PopupMenuItem(
+                                value: 'reorder',
+                                child: Text('Reorder'),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
+                      children: [
+                        _InfoChip(
+                          icon: Icons.settings,
+                          label: AppLocalizations.of(context)!.schemeSetsCount(scheme.setCount),
+                        ),
+                        _InfoChip(
+                          icon: Icons.payments_outlined,
+                          label: CurrencyUtils.formatAmountShort(scheme.totalAmount),
+                        ),
+                      ],
+                    ),
+                    if (scheme.description != null && scheme.description!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          scheme.description!,
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    if (scheme.parentSchemeName != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          'Scheme: ${scheme.parentSchemeName}'
+                          '${scheme.parentSetLabel == null ? '' : ' • Set: ${scheme.parentSetLabel}'}',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    if (isReorderable)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 8),
+                        child: Icon(Icons.drag_handle, color: AppColors.textHint),
+                      ),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.water_drop,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$prefix. ${scheme.schemeName}',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              _InfoChip(
+                                icon: Icons.settings,
+                                label: AppLocalizations.of(context)!.schemeSetsCount(scheme.setCount),
+                              ),
+                              const SizedBox(width: 12),
+                              _InfoChip(
+                                icon: Icons.payments_outlined,
+                                label: CurrencyUtils.formatAmountShort(scheme.totalAmount),
+                              ),
+                            ],
+                          ),
+                          if (scheme.description != null && scheme.description!.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                scheme.description!,
+                                style: Theme.of(context).textTheme.bodySmall,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          if (scheme.parentSchemeName != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'Scheme: ${scheme.parentSchemeName}'
+                                '${scheme.parentSetLabel == null ? '' : ' • Set: ${scheme.parentSetLabel}'}',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (!isReorderable)
+                      PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'edit') _editScheme(scheme);
+                          if (value == 'delete') _deleteScheme(scheme);
+                          if (value == 'reorder') _enterReorderMode();
+                        },
+                        itemBuilder: (ctx) => [
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: Text(AppLocalizations.of(ctx)!.commonEdit),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text(AppLocalizations.of(ctx)!.commonDelete),
+                          ),
+                          const PopupMenuItem(
+                            value: 'reorder',
+                            child: Text('Reorder'),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  void _enterReorderMode() {
+    setState(() => _isReorderMode = true);
   }
 
   List<Scheme> get _filteredSchemes {

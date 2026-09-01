@@ -34,16 +34,17 @@ class _ExportScreenState extends State<ExportScreen> {
   final _exportService = ExportService();
 
   List<Scheme> _schemes = [];
-  List<Scheme> _mainSchemes = [];
   List<SetModel> _sets = [];
   List<Machinery> _machineryForSet = [];
   Scheme? _selectedScheme;
   SetModel? _selectedSet;
   Machinery? _selectedMachinery;
-  List<Map<String, dynamic>> _miscRecords = [];
+  List<String> _miscCategories = [];
   String _miscExportMode = 'single';
   String _uselessExportMode = 'single';
-  String? _selectedMiscRecordId;
+  String? _selectedMiscCategory;
+  List<Scheme> _uselessSchemes = [];
+  Scheme? _selectedUselessScheme;
   String _exportFormat = 'pdf';
   String _exportScope = 'set';
   String _schemeCategory = 'scheme';
@@ -73,11 +74,9 @@ class _ExportScreenState extends State<ExportScreen> {
       }
 
       final schemes = await _schemesDao.getSchemesByCategory(categoryToLoad);
-      final mainSchemes = await _schemesDao.getAllSchemes();
       setState(() {
         _schemeCategory = categoryToLoad;
         _schemes = schemes;
-        _mainSchemes = mainSchemes;
         _isLoading = false;
       });
 
@@ -102,31 +101,33 @@ class _ExportScreenState extends State<ExportScreen> {
       }
 
       await _loadMiscRecords();
+      await _loadUselessSchemes();
     } catch (e) {
       setState(() => _isLoading = false);
     }
   }
 
   Future<void> _loadMiscRecords() async {
-    final recordsRaw = await _miscDao.getAllRecords();
-    final records = recordsRaw
-        .map(
-          (map) => {
-            'id': (map['id'] ?? '').toString(),
-            'title': (map['title'] ?? 'Untitled').toString(),
-            'schemeId': map['schemeId'],
-            'setId': map['setId'],
-          },
-        )
-        .where((entry) => (entry['id'] ?? '').isNotEmpty)
-        .toList();
-
+    final catMeta = await _miscDao.getAllCategoryMeta();
+    final categories = catMeta.map((c) => (c['name'] ?? '').toString()).where((n) => n.isNotEmpty).toList();
     if (!mounted) return;
     setState(() {
-      _miscRecords = records;
-      if (_selectedMiscRecordId != null &&
-          !_miscRecords.any((r) => r['id'] == _selectedMiscRecordId)) {
-        _selectedMiscRecordId = null;
+      _miscCategories = categories;
+      if (_selectedMiscCategory != null &&
+          !_miscCategories.contains(_selectedMiscCategory)) {
+        _selectedMiscCategory = null;
+      }
+    });
+  }
+
+  Future<void> _loadUselessSchemes() async {
+    final schemes = await _schemesDao.getSchemesByCategory('useless_item');
+    if (!mounted) return;
+    setState(() {
+      _uselessSchemes = schemes;
+      if (_selectedUselessScheme != null &&
+          !_uselessSchemes.any((s) => s.schemeId == _selectedUselessScheme!.schemeId)) {
+        _selectedUselessScheme = null;
       }
     });
   }
@@ -199,10 +200,18 @@ class _ExportScreenState extends State<ExportScreen> {
     }
     if (_exportScope == 'miscellaneous' &&
         _miscExportMode == 'single' &&
-        _selectedMiscRecordId == null) {
+        _selectedMiscCategory == null) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(l10n.exportSelectMiscItem)));
+      return;
+    }
+    if (_exportScope == 'useless_items' &&
+        _uselessExportMode == 'single' &&
+        _selectedUselessScheme == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.exportSelectScheme)));
       return;
     }
     setState(() => _isExporting = true);
@@ -232,12 +241,23 @@ class _ExportScreenState extends State<ExportScreen> {
         String filename;
         if (_exportScope == 'miscellaneous') {
           pdfBytes = await _exportService.exportMiscellaneousToPdf(
-            recordId: _miscExportMode == 'single'
-                ? _selectedMiscRecordId
+            category: _miscExportMode == 'single'
+                ? _selectedMiscCategory
                 : null,
-            schemeId: _selectedScheme?.schemeId,
-            setId: widget.setId,
           );
+          filename = _buildSuggestedFileName(extension: 'pdf');
+        } else if (_exportScope == 'useless_items') {
+          if (_uselessExportMode == 'single' && _selectedUselessScheme != null) {
+            pdfBytes = await _exportService.exportSchemeToPdf(
+              _selectedUselessScheme!.schemeId!,
+              headerText: effectiveHeader,
+            );
+          } else {
+            // complete: export all useless item schemes
+            pdfBytes = await _exportService.exportAllUselessItemsToPdf(
+              headerText: effectiveHeader,
+            );
+          }
           filename = _buildSuggestedFileName(extension: 'pdf');
         } else if (isUselessCategoryExport && _uselessExportMode == 'single') {
           pdfBytes = await _exportService.exportSingleMachineryToPdf(
@@ -285,12 +305,18 @@ class _ExportScreenState extends State<ExportScreen> {
         suggestedFileName = _buildSuggestedFileName(extension: 'xlsx');
         if (_exportScope == 'miscellaneous') {
           filePath = await _exportService.exportMiscellaneousToExcel(
-            recordId: _miscExportMode == 'single'
-                ? _selectedMiscRecordId
+            category: _miscExportMode == 'single'
+                ? _selectedMiscCategory
                 : null,
-            schemeId: _selectedScheme?.schemeId,
-            setId: widget.setId,
           );
+        } else if (_exportScope == 'useless_items') {
+          if (_uselessExportMode == 'single' && _selectedUselessScheme != null) {
+            filePath = await _exportService.exportSchemeToExcel(
+              _selectedUselessScheme!.schemeId!,
+            );
+          } else {
+            filePath = await _exportService.exportAllUselessItemsToExcel();
+          }
         } else if (isUselessCategoryExport && _uselessExportMode == 'single') {
           filePath = await _exportService.exportSingleMachineryToExcel(
             _selectedSet!.setId!,
@@ -321,12 +347,18 @@ class _ExportScreenState extends State<ExportScreen> {
         suggestedFileName = _buildSuggestedFileName(extension: 'csv');
         if (_exportScope == 'miscellaneous') {
           filePath = await _exportService.exportMiscellaneousToCsv(
-            recordId: _miscExportMode == 'single'
-                ? _selectedMiscRecordId
+            category: _miscExportMode == 'single'
+                ? _selectedMiscCategory
                 : null,
-            schemeId: _selectedScheme?.schemeId,
-            setId: widget.setId,
           );
+        } else if (_exportScope == 'useless_items') {
+          if (_uselessExportMode == 'single' && _selectedUselessScheme != null) {
+            filePath = await _exportService.exportSchemeToCsv(
+              _selectedUselessScheme!.schemeId!,
+            );
+          } else {
+            filePath = await _exportService.exportAllUselessItemsToCsv();
+          }
         } else if (isUselessCategoryExport && _uselessExportMode == 'single') {
           filePath = await _exportService.exportSingleMachineryToCsv(
             _selectedSet!.setId!,
@@ -426,17 +458,25 @@ class _ExportScreenState extends State<ExportScreen> {
 
   String _buildSuggestedFileName({required String extension}) {
     if (_exportScope == 'miscellaneous') {
-      if (_miscExportMode == 'single' && _selectedMiscRecordId != null) {
-        final item = _miscRecords
-            .where((r) => r['id'] == _selectedMiscRecordId)
-            .firstOrNull;
-        final title = (item?['title'] ?? 'Miscellaneous').replaceAll(
+      if (_miscExportMode == 'single' && _selectedMiscCategory != null) {
+        final safe = _selectedMiscCategory!.replaceAll(
           RegExp(r'[<>:"/\\|?*]'),
           '_',
         );
-        return '${title}_Miscellaneous_Export.$extension';
+        return '${safe}_Miscellaneous_Register.$extension';
       }
-      return 'Miscellaneous_Export.$extension';
+      return 'Miscellaneous_Complete_Report.$extension';
+    }
+
+    if (_exportScope == 'useless_items') {
+      if (_uselessExportMode == 'single' && _selectedUselessScheme != null) {
+        final name = (_selectedUselessScheme!.schemeName).replaceAll(
+          RegExp(r'[<>:"/\\|?*]'),
+          '_',
+        );
+        return '${name}_Useless_Items_Register.$extension';
+      }
+      return 'Useless_Items_Complete_Report.$extension';
     }
 
     if (_isUselessCategoryExport && _uselessExportMode == 'complete') {
@@ -671,6 +711,10 @@ class _ExportScreenState extends State<ExportScreen> {
                           value: 'miscellaneous',
                           label: Text(l10n.navMiscellaneous),
                         ),
+                        ButtonSegment(
+                          value: 'useless_items',
+                          label: Text(l10n.navUselessItems),
+                        ),
                       ],
                       selected: {_exportScope},
                       onSelectionChanged: (v) => setState(() {
@@ -680,14 +724,17 @@ class _ExportScreenState extends State<ExportScreen> {
                         _machineryForSet = [];
                         if (_exportScope == 'miscellaneous') {
                           _miscExportMode = 'single';
-                          _selectedMiscRecordId = null;
+                          _selectedMiscCategory = null;
+                        } else if (_exportScope == 'useless_items') {
+                          _uselessExportMode = 'single';
+                          _selectedUselessScheme = null;
                         } else {
                           _uselessExportMode = 'single';
                         }
                       }),
                     ),
                   ),
-                  if (_exportScope != 'miscellaneous') ...[
+                  if (_exportScope != 'miscellaneous' && _exportScope != 'useless_items') ...[
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
@@ -732,6 +779,11 @@ class _ExportScreenState extends State<ExportScreen> {
                               label: Text(l10n.navMiscellaneous),
                               icon: const Icon(Icons.category_outlined),
                             ),
+                            ButtonSegment(
+                              value: 'useless_items',
+                              label: Text(l10n.navUselessItems),
+                              icon: const Icon(Icons.delete_sweep_outlined),
+                            ),
                           ],
                           selected: {_exportScope},
                           onSelectionChanged: (v) => setState(() {
@@ -741,14 +793,17 @@ class _ExportScreenState extends State<ExportScreen> {
                             _machineryForSet = [];
                             if (_exportScope == 'miscellaneous') {
                               _miscExportMode = 'single';
-                              _selectedMiscRecordId = null;
+                              _selectedMiscCategory = null;
+                            } else if (_exportScope == 'useless_items') {
+                              _uselessExportMode = 'single';
+                              _selectedUselessScheme = null;
                             } else {
                               _uselessExportMode = 'single';
                             }
                           }),
                         ),
                       ),
-                      if (_exportScope != 'miscellaneous') ...[
+                      if (_exportScope != 'miscellaneous' && _exportScope != 'useless_items') ...[
                         const SizedBox(width: 12),
                         Expanded(
                           child: SegmentedButton<String>(
@@ -842,44 +897,73 @@ class _ExportScreenState extends State<ExportScreen> {
                     ),
                     const SizedBox(height: 16),
                   ],
-                ] else
+                ] else if (_exportScope == 'useless_items')
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      DropdownButtonFormField<int>(
-                        initialValue: _selectedScheme?.category == 'scheme'
-                            ? _selectedScheme?.schemeId
-                            : 0,
-                        decoration: const InputDecoration(
-                          labelText: 'Scheme for Miscellaneous Report',
-                          prefixIcon: Icon(Icons.business_outlined),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          l10n.exportMiscModeTitle,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                        items: [
-                          const DropdownMenuItem<int>(
-                            value: 0,
-                            child: Text('All Schemes'),
+                      ),
+                      SegmentedButton<String>(
+                        segments: [
+                          ButtonSegment(
+                            value: 'single',
+                            label: Text(l10n.exportMiscSingleItem),
+                            icon: const Icon(Icons.filter_1),
                           ),
-                          ..._mainSchemes.map(
-                            (scheme) => DropdownMenuItem<int>(
-                              value: scheme.schemeId,
-                              child: Text(scheme.schemeName),
-                            ),
+                          ButtonSegment(
+                            value: 'complete',
+                            label: Text(l10n.exportMiscComplete),
+                            icon: const Icon(Icons.list_alt),
                           ),
                         ],
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedScheme = value == null || value == 0
-                                ? null
-                                : _mainSchemes
-                                      .where(
-                                        (scheme) => scheme.schemeId == value,
-                                      )
-                                      .firstOrNull;
-                            _selectedMiscRecordId = null;
-                          });
-                        },
+                        selected: {_uselessExportMode},
+                        onSelectionChanged: (v) => setState(() {
+                          _uselessExportMode = v.first;
+                          if (_uselessExportMode == 'complete') {
+                            _selectedUselessScheme = null;
+                          }
+                        }),
                       ),
+                      const SizedBox(height: 12),
+                      if (_uselessExportMode == 'single')
+                        DropdownButtonFormField<Scheme>(
+                          initialValue: _selectedUselessScheme,
+                          decoration: InputDecoration(
+                            labelText: l10n.exportSelectSchemeField,
+                            border: const OutlineInputBorder(),
+                          ),
+                          items: _uselessSchemes
+                              .map(
+                                (s) => DropdownMenuItem(
+                                  value: s,
+                                  child: Text(s.schemeName),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) =>
+                              setState(() => _selectedUselessScheme = v),
+                        )
+                      else
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.info_outline),
+                          title: const Text('Complete Useless Items Export'),
+                          subtitle: const Text(
+                            'Exports all useless item registers together.',
+                          ),
+                        ),
                       const SizedBox(height: 16),
+                    ],
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Text(
@@ -904,41 +988,28 @@ class _ExportScreenState extends State<ExportScreen> {
                         onSelectionChanged: (v) => setState(() {
                           _miscExportMode = v.first;
                           if (_miscExportMode == 'complete') {
-                            _selectedMiscRecordId = null;
+                            _selectedMiscCategory = null;
                           }
                         }),
                       ),
                       const SizedBox(height: 12),
                       if (_miscExportMode == 'single')
                         DropdownButtonFormField<String>(
-                          initialValue: _selectedMiscRecordId,
+                          initialValue: _selectedMiscCategory,
                           decoration: InputDecoration(
                             labelText: l10n.exportSelectMiscField,
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
                           ),
-                          items: _miscRecords
-                              .where(
-                                (record) =>
-                                    _selectedScheme == null ||
-                                    record['schemeId'] ==
-                                        _selectedScheme!.schemeId,
-                              )
-                              .where(
-                                (record) =>
-                                    widget.setId == null ||
-                                    record['setId'] == widget.setId,
-                              )
+                          items: _miscCategories
                               .map(
-                                (r) => DropdownMenuItem(
-                                  value: r['id'] as String,
-                                  child: Text(
-                                    r['title'] ?? l10n.commonUntitled,
-                                  ),
+                                (cat) => DropdownMenuItem(
+                                  value: cat,
+                                  child: Text(cat),
                                 ),
                               )
                               .toList(),
                           onChanged: (v) =>
-                              setState(() => _selectedMiscRecordId = v),
+                              setState(() => _selectedMiscCategory = v),
                         )
                       else
                         ListTile(

@@ -5,6 +5,7 @@ class Scheme {
   final int? parentSchemeId;
   final int? parentSetId;
   final String? description;
+  final int sortOrder;
   final String createdAt;
   final String updatedAt;
 
@@ -21,6 +22,7 @@ class Scheme {
     this.parentSchemeId,
     this.parentSetId,
     this.description,
+    this.sortOrder = 0,
     required this.createdAt,
     required this.updatedAt,
     this.setCount = 0,
@@ -37,6 +39,7 @@ class Scheme {
       'parent_scheme_id': parentSchemeId,
       'parent_set_id': parentSetId,
       'description': description,
+      'sort_order': sortOrder,
       'created_at': createdAt,
       'updated_at': updatedAt,
     };
@@ -50,6 +53,7 @@ class Scheme {
       parentSchemeId: map['parent_scheme_id'] as int?,
       parentSetId: map['parent_set_id'] as int?,
       description: map['description'] as String?,
+      sortOrder: (map['sort_order'] as num?)?.toInt() ?? 0,
       createdAt: map['created_at'] as String? ?? '',
       updatedAt: map['updated_at'] as String? ?? '',
       setCount: map['set_count'] as int? ?? 0,
@@ -66,6 +70,7 @@ class Scheme {
     int? parentSchemeId,
     int? parentSetId,
     String? description,
+    int? sortOrder,
     String? createdAt,
     String? updatedAt,
     int? setCount,
@@ -80,6 +85,7 @@ class Scheme {
       parentSchemeId: parentSchemeId ?? this.parentSchemeId,
       parentSetId: parentSetId ?? this.parentSetId,
       description: description ?? this.description,
+      sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       setCount: setCount ?? this.setCount,

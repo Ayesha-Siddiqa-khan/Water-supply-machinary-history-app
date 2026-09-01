@@ -11,11 +11,9 @@ class BillingEntriesDao {
 
   Future<List<BillingEntry>> getEntriesForMachinery(int machineryId) async {
     final db = await _db.database;
-    final result = await db.query(
-      'billing_entries',
-      where: 'machinery_id = ?',
-      whereArgs: [machineryId],
-      orderBy: 'serial_no ASC',
+    final result = await db.rawQuery(
+      'SELECT *, substr(entry_date, 7, 4) || \'-\' || substr(entry_date, 4, 2) || \'-\' || substr(entry_date, 1, 2) AS _date_sort FROM billing_entries WHERE machinery_id = ? ORDER BY _date_sort ASC',
+      [machineryId],
     );
     return result.map((r) => BillingEntry.fromMap(r)).toList();
   }
@@ -41,6 +39,7 @@ class BillingEntriesDao {
       'machinery_id': entry.machineryId,
       'serial_no': entry.serialNo,
       'entry_date': entry.entryDate,
+      'work_order_no': entry.workOrderNo,
       'voucher_no': entry.voucherNo,
       'amount': entry.amount,
       'reg_page_no': entry.regPageNo,
@@ -62,6 +61,7 @@ class BillingEntriesDao {
       {
         'serial_no': entry.serialNo,
         'entry_date': entry.entryDate,
+        'work_order_no': entry.workOrderNo,
         'voucher_no': entry.voucherNo,
         'amount': entry.amount,
         'reg_page_no': entry.regPageNo,
@@ -126,7 +126,8 @@ class BillingEntriesDao {
   Future<List<BillingEntry>> searchEntries(String query) async {
     final db = await _db.database;
     final result = await db.rawQuery('''
-      SELECT be.*, s.scheme_name, st.set_label, m.display_label
+      SELECT be.*, s.scheme_name, st.set_label, m.display_label,
+             substr(be.entry_date, 7, 4) || '-' || substr(be.entry_date, 4, 2) || '-' || substr(be.entry_date, 1, 2) AS _date_sort
       FROM billing_entries be
       JOIN machinery m ON m.machinery_id = be.machinery_id
       JOIN sets st ON st.set_id = m.set_id
@@ -134,7 +135,7 @@ class BillingEntriesDao {
       WHERE be.voucher_no LIKE ? OR be.amount LIKE ? OR be.entry_date LIKE ?
         OR s.scheme_name LIKE ? OR st.set_label LIKE ? OR m.display_label LIKE ?
         OR be.reg_page_no LIKE ? OR be.transferred_to_scheme LIKE ? OR be.remarks LIKE ?
-      ORDER BY be.entry_id DESC
+      ORDER BY _date_sort DESC
       LIMIT 50
     ''', [
       '%$query%',
@@ -185,11 +186,12 @@ class BillingEntriesDao {
   Future<List<BillingEntry>> getEntriesForSet(int setId) async {
     final db = await _db.database;
     final result = await db.rawQuery('''
-      SELECT be.*, m.display_label
+      SELECT be.*, m.display_label,
+             substr(be.entry_date, 7, 4) || '-' || substr(be.entry_date, 4, 2) || '-' || substr(be.entry_date, 1, 2) AS _date_sort
       FROM billing_entries be
       JOIN machinery m ON m.machinery_id = be.machinery_id
       WHERE m.set_id = ?
-      ORDER BY m.sort_order ASC, be.serial_no ASC
+      ORDER BY m.sort_order ASC, _date_sort ASC
     ''', [setId]);
     return result.map((r) => BillingEntry.fromMap(r)).toList();
   }
@@ -198,13 +200,14 @@ class BillingEntriesDao {
   Future<List<BillingEntry>> getEntriesForScheme(int schemeId) async {
     final db = await _db.database;
     final result = await db.rawQuery('''
-      SELECT be.*, s.scheme_name, st.set_label, m.display_label
+      SELECT be.*, s.scheme_name, st.set_label, m.display_label,
+             substr(be.entry_date, 7, 4) || '-' || substr(be.entry_date, 4, 2) || '-' || substr(be.entry_date, 1, 2) AS _date_sort
       FROM billing_entries be
       JOIN machinery m ON m.machinery_id = be.machinery_id
       JOIN sets st ON st.set_id = m.set_id
       JOIN schemes s ON s.scheme_id = st.scheme_id
       WHERE s.scheme_id = ?
-      ORDER BY st.set_number ASC, m.sort_order ASC, be.serial_no ASC
+      ORDER BY st.set_number ASC, m.sort_order ASC, _date_sort ASC
     ''', [schemeId]);
     return result.map((r) => BillingEntry.fromMap(r)).toList();
   }

@@ -1,1319 +1,685 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:printing/printing.dart';
-import '../../core/database/daos/settings_dao.dart';
 import '../../core/database/daos/miscellaneous_dao.dart';
-import '../../core/database/daos/schemes_dao.dart';
-import '../../core/database/daos/sets_dao.dart';
-import '../../core/models/scheme.dart';
-import '../../core/models/set_model.dart';
-import '../../core/services/export_service.dart';
 import '../../shared/theme/app_colors.dart';
+import 'category_detail_screen.dart';
+
+// ─── Icon name resolver ──────────────────────────────────────────────
+
+IconData _iconFromName(String name) {
+  const map = <String, IconData>{
+    'water_drop_outlined': Icons.water_drop_outlined,
+    'power_outlined': Icons.power_outlined,
+    'electrical_services_outlined': Icons.electrical_services_outlined,
+    'settings_outlined': Icons.settings_outlined,
+    'bolt_outlined': Icons.bolt_outlined,
+    'engineering_outlined': Icons.engineering_outlined,
+    'science_outlined': Icons.science_outlined,
+    'category_outlined': Icons.category_outlined,
+    'build_outlined': Icons.build_outlined,
+    'construction_outlined': Icons.construction_outlined,
+    'plumbing_outlined': Icons.plumbing_outlined,
+    'electric_bolt_outlined': Icons.electric_bolt_outlined,
+    'local_fire_department_outlined': Icons.local_fire_department_outlined,
+    'health_and_safety_outlined': Icons.health_and_safety_outlined,
+    'warning_amber_outlined': Icons.warning_amber_outlined,
+    'inventory_2_outlined': Icons.inventory_2_outlined,
+    'warehouse_outlined': Icons.warehouse_outlined,
+    'handyman_outlined': Icons.handyman_outlined,
+    'precision_manufacturing_outlined': Icons.precision_manufacturing_outlined,
+    'schema_outlined': Icons.schema_outlined,
+    'device_hub_outlined': Icons.device_hub_outlined,
+    'router_outlined': Icons.router_outlined,
+    'memory_outlined': Icons.memory_outlined,
+    'developer_board_outlined': Icons.developer_board_outlined,
+    'cable_outlined': Icons.cable_outlined,
+    'extension_outlined': Icons.extension_outlined,
+    'battery_charging_full_outlined': Icons.battery_charging_full_outlined,
+    'solar_power_outlined': Icons.solar_power_outlined,
+    'water_outlined': Icons.water_outlined,
+    'pipe_outlined': Icons.plumbing_outlined,
+    'valve_outlined': Icons.settings_outlined,
+    'filter_alt_outlined': Icons.filter_alt_outlined,
+    'ac_unit_outlined': Icons.ac_unit_outlined,
+    'speed_outlined': Icons.speed_outlined,
+    'thermostat_outlined': Icons.thermostat_outlined,
+    'sensors_outlined': Icons.sensors_outlined,
+    'videocam_outlined': Icons.videocam_outlined,
+    'lock_outlined': Icons.lock_outlined,
+    'key_outlined': Icons.key_outlined,
+    'shield_outlined': Icons.shield_outlined,
+    'alarm_outlined': Icons.alarm_outlined,
+    'notification_important_outlined': Icons.notification_important_outlined,
+    'report_outlined': Icons.report_outlined,
+    'analytics_outlined': Icons.analytics_outlined,
+    'assessment_outlined': Icons.assessment_outlined,
+    'timeline_outlined': Icons.timeline_outlined,
+    'date_range_outlined': Icons.date_range_outlined,
+    'event_outlined': Icons.event_outlined,
+    'schedule_outlined': Icons.schedule_outlined,
+    'pending_outlined': Icons.pending_outlined,
+    'check_circle_outline': Icons.check_circle_outline,
+    'cancel_outlined': Icons.cancel_outlined,
+    'info_outline': Icons.info_outline,
+    'help_outline': Icons.help_outline,
+    'star_outline': Icons.star_outline,
+    'favorite_outline': Icons.favorite_outlined,
+    'bookmark_outline': Icons.bookmark_outline,
+    'flag_outlined': Icons.flag_outlined,
+    'label_outlined': Icons.label_outlined,
+    'new_releases_outlined': Icons.new_releases_outlined,
+    'upcoming_outlined': Icons.upcoming_outlined,
+    'tour_outlined': Icons.tour_outlined,
+    'explore_outlined': Icons.explore_outlined,
+    'map_outlined': Icons.map_outlined,
+    'place_outlined': Icons.place_outlined,
+    'near_me_outlined': Icons.near_me_outlined,
+    'directions_outlined': Icons.directions_outlined,
+    'traffic_outlined': Icons.traffic_outlined,
+    'trip_origin_outlined': Icons.trip_origin_outlined,
+    'flight_outlined': Icons.flight_outlined,
+    'flight_takeoff_outlined': Icons.flight_takeoff_outlined,
+    'flight_land_outlined': Icons.flight_land_outlined,
+    'rocket_outlined': Icons.rocket_outlined,
+    'satellite_outlined': Icons.satellite_outlined,
+    'dns_outlined': Icons.dns_outlined,
+    'cloud_outlined': Icons.cloud_outlined,
+    'cloud_queue_outlined': Icons.cloud_queue_outlined,
+    'storage_outlined': Icons.storage_outlined,
+    'sd_storage_outlined': Icons.sd_storage_outlined,
+    'sim_card_outlined': Icons.sim_card_outlined,
+    'sim_card_alert_outlined': Icons.sim_card_alert_outlined,
+  };
+  return map[name] ?? Icons.category_outlined;
+}
+
+const _presetIconNames = <String>[
+  'water_drop_outlined',
+  'power_outlined',
+  'electrical_services_outlined',
+  'settings_outlined',
+  'bolt_outlined',
+  'engineering_outlined',
+  'science_outlined',
+  'category_outlined',
+  'build_outlined',
+  'construction_outlined',
+  'plumbing_outlined',
+  'electric_bolt_outlined',
+  'local_fire_department_outlined',
+  'health_and_safety_outlined',
+  'warning_amber_outlined',
+  'inventory_2_outlined',
+  'warehouse_outlined',
+  'handyman_outlined',
+  'precision_manufacturing_outlined',
+  'schema_outlined',
+  'device_hub_outlined',
+  'memory_outlined',
+  'developer_board_outlined',
+  'cable_outlined',
+  'battery_charging_full_outlined',
+  'solar_power_outlined',
+  'water_outlined',
+  'filter_alt_outlined',
+  'ac_unit_outlined',
+  'speed_outlined',
+  'thermostat_outlined',
+  'sensors_outlined',
+  'videocam_outlined',
+  'lock_outlined',
+  'key_outlined',
+  'shield_outlined',
+  'alarm_outlined',
+  'notification_important_outlined',
+  'report_outlined',
+  'analytics_outlined',
+  'assessment_outlined',
+  'timeline_outlined',
+  'date_range_outlined',
+  'event_outlined',
+  'schedule_outlined',
+  'check_circle_outline',
+  'info_outline',
+  'star_outline',
+  'flag_outlined',
+  'label_outlined',
+];
+
+const _presetColors = <int>[
+  0xFFE53935,
+  0xFF1E88E5,
+  0xFFFDD835,
+  0xFF43A047,
+  0xFF8E24AA,
+  0xFFD81B60,
+  0xFF00ACC1,
+  0xFF6D4C41,
+  0xFFFF6F00,
+  0xFF1565C0,
+  0xFF2E7D32,
+  0xFF6A1B9A,
+  0xFFC62828,
+  0xFF00838F,
+  0xFFEF6C00,
+  0xFF4527A0,
+];
+
+// ─── Screen ──────────────────────────────────────────────────────────
 
 class MiscellaneousScreen extends StatefulWidget {
-  final int? initialSchemeId;
-  final String? initialSchemeName;
-  final int? initialSetId;
-  final String? initialSetLabel;
-
-  const MiscellaneousScreen({
-    super.key,
-    this.initialSchemeId,
-    this.initialSchemeName,
-    this.initialSetId,
-    this.initialSetLabel,
-  });
+  const MiscellaneousScreen({super.key});
 
   @override
   State<MiscellaneousScreen> createState() => _MiscellaneousScreenState();
 }
 
 class _MiscellaneousScreenState extends State<MiscellaneousScreen> {
-  final _settingsDao = SettingsDao();
   final _miscDao = MiscellaneousDao();
-  final _schemesDao = SchemesDao();
-  final _setsDao = SetsDao();
-
-  List<String> _miscTypes = [];
-  List<_MiscRecord> _records = [];
-  List<Scheme> _schemes = [];
-  Map<int, List<SetModel>> _setsBySchemeId = {};
-  int? _schemeFilter;
-  int? _setFilter;
-  String _searchQuery = '';
+  List<Map<String, dynamic>> _categories = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _schemeFilter = widget.initialSchemeId;
-    _setFilter = widget.initialSetId;
     _loadData();
   }
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-
-    final miscItemsRaw = await _settingsDao.getSetting('misc_items_json');
-    final schemes = await _schemesDao.getAllSchemes();
-    final setsBySchemeId = <int, List<SetModel>>{};
-    for (final scheme in schemes) {
-      if (scheme.schemeId != null) {
-        setsBySchemeId[scheme.schemeId!] = await _setsDao.getSetsForScheme(
-          scheme.schemeId!,
-        );
-      }
-    }
-
-    var miscTypes = <String>['Leakage', 'Starter', 'Pipes', 'Electrical'];
-    if (miscItemsRaw != null && miscItemsRaw.trim().isNotEmpty) {
-      try {
-        final decoded = jsonDecode(miscItemsRaw);
-        if (decoded is List) {
-          final loaded = decoded
-              .map((e) => e.toString().trim())
-              .where((e) => e.isNotEmpty)
-              .toSet()
-              .toList();
-          if (loaded.isNotEmpty) {
-            miscTypes = loaded;
-          }
-        }
-      } catch (_) {}
-    }
-
-    final dbRecordsRaw = await _miscDao.getAllRecords();
-    final records = dbRecordsRaw
-        .map((e) => _MiscRecord.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-
-    for (final record in records) {
-      if (!miscTypes.any(
-        (t) => t.toLowerCase() == record.category.toLowerCase(),
-      )) {
-        miscTypes.add(record.category);
-      }
-    }
-
+    final cats = await _miscDao.getAllCategoryMeta();
     if (!mounted) return;
     setState(() {
-      _miscTypes = miscTypes;
-      _records = records;
-      _schemes = schemes;
-      _setsBySchemeId = setsBySchemeId;
+      _categories = cats;
       _isLoading = false;
     });
   }
 
-  Future<void> _persistRecords() async {
-    await _miscDao.replaceAllRecords(_records.map((r) => r.toJson()).toList());
-
-    final groupedTitles = <String, List<String>>{};
-    for (final record in _records) {
-      final list = groupedTitles.putIfAbsent(record.category, () => []);
-      if (!list.any((v) => v.toLowerCase() == record.title.toLowerCase())) {
-        list.add(record.title);
-      }
-    }
-    try {
-      await _settingsDao.setSetting(
-        'misc_custom_values_json',
-        jsonEncode(groupedTitles),
-      );
-    } catch (_) {
-      // The SQLite record is the source of truth. A custom-value cache failure
-      // must not make a successfully saved miscellaneous item appear to fail.
-    }
-  }
-
-  Future<bool> _persistWithRollback(List<_MiscRecord> previousRecords) async {
-    try {
-      await _persistRecords();
-      return true;
-    } catch (e) {
-      if (!mounted) return false;
-      setState(() => _records = previousRecords);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save miscellaneous item: $e')),
-      );
-      return false;
-    }
-  }
-
-  Future<void> _addRecord() async {
-    await _showRecordDialog();
-  }
-
-  Future<void> _showExportOptions() async {
-    final result = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf),
-              title: const Text('Export as PDF'),
-              subtitle: const Text('Professional A4 report for all records'),
-              onTap: () => Navigator.pop(ctx, 'pdf'),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.table_chart_outlined),
-              title: const Text('Export as Excel'),
-              subtitle: const Text('Spreadsheet format for all records'),
-              onTap: () => Navigator.pop(ctx, 'excel'),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.code),
-              title: const Text('Export as CSV'),
-              subtitle: const Text('Plain text comma-separated values'),
-              onTap: () => Navigator.pop(ctx, 'csv'),
-            ),
-          ],
-        ),
-      ),
+  void _openCategory(Map<String, dynamic> cat) async {
+    final name = (cat['name'] ?? '').toString();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CategoryDetailScreen(categoryName: name)),
     );
-    if (result == null || !mounted) return;
-
-    try {
-      if (result == 'pdf') {
-        final savedHeader = await ExportService.loadHeaderText();
-        final headerText = await ExportService.showHeaderEditDialog(
-          context,
-          currentHeader: savedHeader,
-        );
-        if (!mounted) return;
-        final effectiveHeader = (headerText != null && headerText.isNotEmpty)
-            ? headerText
-            : savedHeader;
-
-        final bytes = await ExportService().exportMiscellaneousToPdf(
-          schemeId: widget.initialSchemeId,
-          setId: widget.initialSetId,
-        );
-        if (!mounted) return;
-
-        if (headerText != null && headerText.isNotEmpty) {
-          await ExportService.saveHeaderText(headerText);
-        }
-
-        final baseName = (widget.initialSchemeName ?? 'Miscellaneous')
-            .replaceAll(RegExp(r'[^\w\s]'), '_');
-        final pdfName = '${baseName}_Report.pdf';
-
-        if (Platform.isAndroid || Platform.isIOS) {
-          await Printing.sharePdf(bytes: bytes, filename: pdfName);
-        } else {
-          await Printing.layoutPdf(onLayout: (_) async => bytes, name: pdfName);
-        }
-      } else if (result == 'excel') {
-        final filePath = await ExportService().exportMiscellaneousToExcel(
-          schemeId: widget.initialSchemeId,
-          setId: widget.initialSetId,
-        );
-        if (!mounted) return;
-
-        final file = File(filePath);
-        if (Platform.isAndroid || Platform.isIOS) {
-          await Printing.sharePdf(
-            bytes: await file.readAsBytes(),
-            filename: filePath.split(Platform.pathSeparator).last,
-          );
-        } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Excel saved to: $filePath')));
-        }
-      } else if (result == 'csv') {
-        final filePath = await ExportService().exportMiscellaneousToCsv(
-          schemeId: widget.initialSchemeId,
-          setId: widget.initialSetId,
-        );
-        if (!mounted) return;
-
-        final file = File(filePath);
-        if (Platform.isAndroid || Platform.isIOS) {
-          await Printing.sharePdf(
-            bytes: await file.readAsBytes(),
-            filename: filePath.split(Platform.pathSeparator).last,
-          );
-        } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('CSV saved to: $filePath')));
-        }
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error exporting: $e')));
-    }
+    _loadData();
   }
 
-  Future<void> _showRecordDialog({_MiscRecord? existing}) async {
-    final titleCtrl = TextEditingController();
-    titleCtrl.text = existing?.title ?? '';
-    var selectedCategory =
-        existing?.category ??
-        (_miscTypes.isNotEmpty ? _miscTypes.first : 'Miscellaneous');
-    int? selectedSchemeId = existing?.schemeId ?? widget.initialSchemeId;
-    int? selectedSetId = existing?.setId ?? widget.initialSetId;
-    String? validationError;
+  Future<void> _showCategoryDialog({Map<String, dynamic>? existing}) async {
+    final isEdit = existing != null;
+    final nameCtrl = TextEditingController(text: existing?['name']?.toString() ?? '');
+    final descCtrl = TextEditingController(text: existing?['description']?.toString() ?? '');
+    String iconName = existing?['icon_name']?.toString() ?? 'category_outlined';
+    int colorValue = existing?['color_value'] as int? ?? AppColors.primary.toARGB32();
+    List<Map<String, dynamic>> customFields = [];
+    if (existing?['custom_fields'] != null) {
+      try {
+        customFields = List<Map<String, dynamic>>.from(jsonDecode(existing!['custom_fields'].toString()));
+      } catch (_) {}
+    }
 
-    final created = await showDialog<_MiscRecord>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setLocalState) => AlertDialog(
-          title: Text(
-            existing == null
-                ? 'Add Miscellaneous Item'
-                : 'Edit Miscellaneous Item',
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleCtrl,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Title',
-                  hintText: 'e.g., Tubewell Main Leakage',
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(isEdit ? 'Edit Category' : 'Add New Category'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Category Name *',
+                    hintText: 'e.g., Generator, Pipeline Repair',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                initialValue: selectedSchemeId,
-                decoration: const InputDecoration(
-                  labelText: 'Related Scheme *',
-                ),
-                items: _schemes
-                    .map(
-                      (scheme) => DropdownMenuItem<int>(
-                        value: scheme.schemeId,
-                        child: Text(scheme.schemeName),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => setLocalState(() {
-                  selectedSchemeId = value;
-                  selectedSetId = null;
-                }),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                key: ValueKey(selectedSchemeId),
-                initialValue: selectedSetId,
-                decoration: const InputDecoration(labelText: 'Related Set *'),
-                items: (_setsBySchemeId[selectedSchemeId] ?? const <SetModel>[])
-                    .map(
-                      (set) => DropdownMenuItem<int>(
-                        value: set.setId,
-                        child: Text(set.setLabel),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) =>
-                    setLocalState(() => selectedSetId = value),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: selectedCategory,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: _miscTypes
-                    .map(
-                      (type) =>
-                          DropdownMenuItem(value: type, child: Text(type)),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setLocalState(() => selectedCategory = value);
-                  }
-                },
-              ),
-              if (validationError != null) ...[
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    validationError!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                      fontSize: 12,
+                const SizedBox(height: 16),
+
+                // Icon picker
+                Text('Icon', style: Theme.of(ctx).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: SingleChildScrollView(
+                    child: Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: _presetIconNames.map((name) {
+                        final isSelected = name == iconName;
+                        return SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: IconButton(
+                            iconSize: 20,
+                            padding: EdgeInsets.zero,
+                            icon: Icon(
+                              _iconFromName(name),
+                              color: isSelected ? Color(colorValue) : AppColors.textSecondary,
+                            ),
+                            style: IconButton.styleFrom(
+                              backgroundColor: isSelected
+                                  ? Color(colorValue).withValues(alpha: 0.15)
+                                  : null,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                side: isSelected
+                                    ? BorderSide(color: Color(colorValue), width: 2)
+                                    : BorderSide.none,
+                              ),
+                            ),
+                            onPressed: () => setDialogState(() => iconName = name),
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+
+                // Color picker
+                Text('Color', style: Theme.of(ctx).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _presetColors.map((c) {
+                    final isSelected = c == colorValue;
+                    return GestureDetector(
+                      onTap: () => setDialogState(() => colorValue = c),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Color(c),
+                          shape: BoxShape.circle,
+                          border: isSelected
+                              ? Border.all(color: Colors.white, width: 3)
+                              : null,
+                          boxShadow: isSelected
+                              ? [BoxShadow(color: Color(c).withValues(alpha: 0.5), blurRadius: 6)]
+                              : null,
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check, color: Colors.white, size: 18)
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
+
+                // Description
+                TextField(
+                  controller: descCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'Optional description',
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 16),
+
+                // Custom fields
+                Row(
+                  children: [
+                    Text('Custom Fields', style: Theme.of(ctx).textTheme.titleSmall),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () async {
+                        final field = await _showAddFieldDialog(ctx);
+                        if (field != null) setDialogState(() => customFields.add(field));
+                      },
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add'),
+                    ),
+                  ],
+                ),
+                if (customFields.isNotEmpty)
+                  ...customFields.asMap().entries.map((e) {
+                    final i = e.key;
+                    final f = e.value;
+                    return ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.tune, size: 18, color: AppColors.textSecondary),
+                      title: Text(f['label'] ?? ''),
+                      subtitle: Text('${f['type'] ?? 'dropdown'} • ${(f['options'] as List?)?.length ?? 0} options'),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        onPressed: () => setDialogState(() => customFields.removeAt(i)),
+                      ),
+                    );
+                  }),
               ],
-            ],
+            ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () {
-                final title = titleCtrl.text.trim();
-                if (title.isEmpty ||
-                    selectedSchemeId == null ||
-                    selectedSetId == null) {
-                  setLocalState(
-                    () => validationError = title.isEmpty
-                        ? 'Please enter an item title.'
-                        : 'Please select the related Scheme and Set.',
-                  );
-                  return;
-                }
-                final selectedScheme = _schemes
-                    .where((scheme) => scheme.schemeId == selectedSchemeId)
-                    .firstOrNull;
-                final selectedSet =
-                    (_setsBySchemeId[selectedSchemeId] ?? const <SetModel>[])
-                        .where((set) => set.setId == selectedSetId)
-                        .firstOrNull;
-                Navigator.pop(
-                  ctx,
-                  _MiscRecord(
-                    id:
-                        existing?.id ??
-                        DateTime.now().microsecondsSinceEpoch.toString(),
-                    title: title,
-                    category: selectedCategory,
-                    schemeId: selectedSchemeId,
-                    schemeName: selectedScheme?.schemeName,
-                    setId: selectedSetId,
-                    setLabel: selectedSet?.setLabel,
-                    entries: existing?.entries ?? [],
-                  ),
-                );
+                final name = nameCtrl.text.trim();
+                if (name.isEmpty) return;
+                Navigator.pop(ctx, {
+                  'name': name,
+                  'icon_name': iconName,
+                  'color_value': colorValue,
+                  'description': descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                  'custom_fields': customFields.isEmpty ? null : jsonEncode(customFields),
+                  'sort_order': existing?['sort_order'] ?? _categories.length,
+                });
               },
-              child: Text(existing == null ? 'Add' : 'Save'),
+              child: Text(isEdit ? 'Save' : 'Add'),
             ),
           ],
         ),
       ),
     );
+    nameCtrl.dispose();
+    descCtrl.dispose();
+    if (result == null) return;
 
-    if (created == null) return;
-
-    final previousRecords = List<_MiscRecord>.from(_records);
-    final index = _records.indexWhere((r) => r.id == created.id);
-    setState(() {
-      if (index == -1) {
-        _records.add(created);
-      } else {
-        _records[index] = created;
+    if (isEdit) {
+      final catId = existing['category_id'] as int;
+      final oldName = (existing['name'] ?? '').toString();
+      await _miscDao.updateCategory(catId, result);
+      if (result['name'] != oldName) {
+        await _miscDao.renameCategoryInRecords(oldName, result['name']);
       }
-    });
-    final saved = await _persistWithRollback(previousRecords);
-    if (saved && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Miscellaneous item saved.')),
-      );
+    } else {
+      await _miscDao.insertCategory(result);
     }
+    _loadData();
   }
 
-  Future<void> _deleteRecord(_MiscRecord record) async {
-    final confirmed = await showDialog<bool>(
+  Future<Map<String, dynamic>?> _showAddFieldDialog(BuildContext context) async {
+    final labelCtrl = TextEditingController();
+    String type = 'dropdown';
+    final optionsCtrl = TextEditingController();
+
+    return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Item'),
-        content: Text('Delete "${record.title}" and all expenditures?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+        title: const Text('Add Custom Field'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: labelCtrl,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Field Label *'),
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'dropdown', label: Text('Dropdown')),
+                  ButtonSegment(value: 'text', label: Text('Text')),
+                  ButtonSegment(value: 'number', label: Text('Number')),
+                ],
+                selected: {type},
+                onSelectionChanged: (v) => type = v.first,
+              ),
+              const SizedBox(height: 12),
+              if (type == 'dropdown')
+                TextField(
+                  controller: optionsCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Options (one per line)',
+                    hintText: 'Option 1\nOption 2\nOption 3',
+                  ),
+                  maxLines: 4,
+                ),
+            ],
           ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () {
+              final label = labelCtrl.text.trim();
+              if (label.isEmpty) return;
+              final options = type == 'dropdown'
+                  ? optionsCtrl.text.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+                  : <String>[];
+              Navigator.pop(ctx, {'label': label, 'type': type, 'options': options, 'key': label.toLowerCase().replaceAll(RegExp(r'\s+'), '_')});
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteCategory(Map<String, dynamic> cat) async {
+    final name = (cat['name'] ?? '').toString();
+    final count = cat['record_count'] as int? ?? 0;
+
+    final action = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Category'),
+        content: count > 0
+            ? Text('"$name" has $count record${count == 1 ? '' : 's'}. What would you like to do?')
+            : Text('Delete "$name" category?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          if (count > 0)
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'archive'),
+              child: const Text('Archive Records'),
+            ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, 'delete'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Delete'),
           ),
         ],
       ),
     );
+    if (action == null) return;
 
-    if (confirmed != true) return;
-    final previousRecords = List<_MiscRecord>.from(_records);
-    setState(() {
-      _records.removeWhere((r) => r.id == record.id);
-    });
-    await _persistWithRollback(previousRecords);
-  }
-
-  Future<void> _openRecord(_MiscRecord record) async {
-    final updated = await Navigator.push<_MiscRecord>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _MiscRecordDetailScreen(
-          record: record,
-          categoryOptions: _miscTypes,
-        ),
-      ),
-    );
-
-    if (updated == null) return;
-
-    final index = _records.indexWhere((r) => r.id == updated.id);
-    if (index == -1) return;
-
-    final previousRecords = List<_MiscRecord>.from(_records);
-    setState(() {
-      _records[index] = updated;
-    });
-    await _persistWithRollback(previousRecords);
+    if (action == 'archive') {
+      // Move records to "Other" category, then delete this category
+      final otherCat = await _miscDao.getCategoryMetaByName('Other');
+      if (otherCat != null) {
+        await _miscDao.renameCategoryInRecords(name, 'Other');
+      } else {
+        // No "Other" category exists, just delete records
+        await _miscDao.deleteRecordsByCategory(name);
+      }
+    }
+    if (action == 'delete' && count > 0) {
+      await _miscDao.deleteRecordsByCategory(name);
+    }
+    await _miscDao.deleteCategory(cat['category_id'] as int);
+    _loadData();
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth >= 900 ? 4 : (screenWidth >= 600 ? 3 : 2);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.initialSetLabel != null
-              ? 'Miscellaneous — ${widget.initialSetLabel}'
-              : widget.initialSchemeName == null
-              ? 'Miscellaneous'
-              : 'Miscellaneous — ${widget.initialSchemeName}',
-        ),
+        title: const Text('Miscellaneous'),
         actions: [
-          IconButton(
-            onPressed: _showExportOptions,
-            icon: const Icon(Icons.print_outlined),
-            tooltip: 'Print / Export',
-          ),
+          IconButton(onPressed: _loadData, icon: const Icon(Icons.refresh), tooltip: 'Refresh'),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addRecord,
-        child: const Icon(Icons.add),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _records.isEmpty
-          ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(20),
-                child: Text(
-                  'No miscellaneous items yet.\nTap + to add title, category, and expenditures.',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            )
           : RefreshIndicator(
               onRefresh: _loadData,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: _filteredRecords.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Column(
-                      children: [
-                        TextField(
-                          decoration: const InputDecoration(
-                            hintText: 'Search miscellaneous records...',
-                            prefixIcon: Icon(Icons.search),
-                          ),
-                          onChanged: (value) =>
-                              setState(() => _searchQuery = value.trim()),
+              child: _categories.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.category_outlined, size: 64, color: AppColors.textHint),
+                            const SizedBox(height: 16),
+                            const Text('No categories yet.\nTap + to add one.', textAlign: TextAlign.center),
+                          ],
                         ),
-                        const SizedBox(height: 10),
-                        if (widget.initialSchemeId == null)
-                          DropdownButtonFormField<int?>(
-                            initialValue: _schemeFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'Filter by Scheme',
-                              prefixIcon: Icon(Icons.filter_alt_outlined),
-                            ),
-                            items: [
-                              const DropdownMenuItem<int?>(
-                                value: null,
-                                child: Text('All Schemes'),
-                              ),
-                              ..._schemes.map(
-                                (scheme) => DropdownMenuItem<int?>(
-                                  value: scheme.schemeId,
-                                  child: Text(scheme.schemeName),
-                                ),
-                              ),
-                            ],
-                            onChanged: (value) => setState(() {
-                              _schemeFilter = value;
-                              _setFilter = null;
-                            }),
-                          ),
-                        if (widget.initialSetId == null) ...[
-                          const SizedBox(height: 10),
-                          DropdownButtonFormField<int?>(
-                            key: ValueKey(_schemeFilter),
-                            initialValue: _setFilter,
-                            decoration: const InputDecoration(
-                              labelText: 'Filter by Set',
-                              prefixIcon: Icon(Icons.folder_outlined),
-                            ),
-                            items: [
-                              const DropdownMenuItem<int?>(
-                                value: null,
-                                child: Text('All Sets'),
-                              ),
-                              ..._setsForFilter.map(
-                                (set) => DropdownMenuItem<int?>(
-                                  value: set.setId,
-                                  child: Text(set.setLabel),
-                                ),
-                              ),
-                            ],
-                            onChanged: (value) =>
-                                setState(() => _setFilter = value),
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-                      ],
-                    );
-                  }
-                  final record = _filteredRecords[index - 1];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      onTap: () => _openRecord(record),
-                      leading: const CircleAvatar(
-                        child: Icon(Icons.category_outlined),
                       ),
-                      title: Text(record.title),
-                      subtitle: Text(
-                        '${record.schemeName ?? 'Unassigned Scheme'} • '
-                        '${record.setLabel ?? 'Unassigned Set'} • ${record.category} • '
-                        '${record.entries.length} entries • Rs. ${record.totalAmount.toStringAsFixed(0)}',
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 1.4,
                       ),
-                      trailing: PopupMenuButton<String>(
-                        onSelected: (value) {
-                          if (value == 'edit') {
-                            _showRecordDialog(existing: record);
-                          }
-                          if (value == 'delete') {
-                            _deleteRecord(record);
-                          }
-                        },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          PopupMenuItem(value: 'delete', child: Text('Delete')),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-    );
-  }
-
-  List<_MiscRecord> get _filteredRecords {
-    final query = _searchQuery.toLowerCase();
-    return _records.where((record) {
-      final matchesScheme =
-          _schemeFilter == null || record.schemeId == _schemeFilter;
-      final matchesSet = _setFilter == null || record.setId == _setFilter;
-      final matchesSearch =
-          query.isEmpty ||
-          record.title.toLowerCase().contains(query) ||
-          record.category.toLowerCase().contains(query) ||
-          (record.schemeName?.toLowerCase().contains(query) ?? false);
-      return matchesScheme && matchesSet && matchesSearch;
-    }).toList();
-  }
-
-  List<SetModel> get _setsForFilter {
-    if (_schemeFilter != null) {
-      return _setsBySchemeId[_schemeFilter] ?? const <SetModel>[];
-    }
-    return _setsBySchemeId.values.expand((sets) => sets).toList();
-  }
-}
-
-class _MiscRecordDetailScreen extends StatefulWidget {
-  final _MiscRecord record;
-  final List<String> categoryOptions;
-
-  const _MiscRecordDetailScreen({
-    required this.record,
-    required this.categoryOptions,
-  });
-
-  @override
-  State<_MiscRecordDetailScreen> createState() =>
-      _MiscRecordDetailScreenState();
-}
-
-class _MiscRecordDetailScreenState extends State<_MiscRecordDetailScreen> {
-  late _MiscRecord _record;
-
-  @override
-  void initState() {
-    super.initState();
-    _record = widget.record.copyWith(
-      entries: widget.record.entries.map((e) => e.copyWith()).toList(),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
-  }
-
-  DateTime _parseDate(String value) {
-    final parts = value.split('-');
-    if (parts.length != 3) return DateTime.now();
-    final day = int.tryParse(parts[0]) ?? 1;
-    final month = int.tryParse(parts[1]) ?? 1;
-    final year = int.tryParse(parts[2]) ?? DateTime.now().year;
-    return DateTime(year, month, day);
-  }
-
-  Future<void> _showEntryDialog({_MiscEntry? existing}) async {
-    final amountCtrl = TextEditingController();
-    final voucherCtrl = TextEditingController();
-    final regPageCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-    final dateCtrl = TextEditingController();
-
-    var category = existing?.category ?? _record.category;
-    var selectedDate = existing != null
-        ? _parseDate(existing.entryDate)
-        : DateTime.now();
-
-    amountCtrl.text = existing != null
-        ? existing.amount.toStringAsFixed(0)
-        : '';
-    voucherCtrl.text = existing?.voucherNo ?? '';
-    regPageCtrl.text = existing?.regPageNo ?? '';
-    noteCtrl.text = existing?.notes ?? '';
-    dateCtrl.text = existing?.entryDate ?? _formatDate(selectedDate);
-
-    final entry = await showDialog<_MiscEntry>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setLocalState) => AlertDialog(
-          title: Text(
-            existing == null ? 'Add Expenditure' : 'Edit Expenditure',
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  readOnly: true,
-                  controller: dateCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Date (DD-MM-YYYY)',
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.calendar_today),
-                      onPressed: () async {
-                        final picked = await showDatePicker(
-                          context: context,
-                          initialDate: selectedDate,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
+                      itemCount: _categories.length + 1,
+                      itemBuilder: (context, index) {
+                        if (index == _categories.length) {
+                          return _AddCategoryCard(onTap: () => _showCategoryDialog());
+                        }
+                        final cat = _categories[index];
+                        return _CategoryCard(
+                          category: cat,
+                          onTap: () => _openCategory(cat),
+                          onEdit: () => _showCategoryDialog(existing: cat),
+                          onDelete: () => _deleteCategory(cat),
                         );
-                        if (picked == null) return;
-                        setLocalState(() {
-                          selectedDate = picked;
-                          dateCtrl.text = _formatDate(picked);
-                        });
                       },
                     ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: category,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items: widget.categoryOptions
-                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) {
-                      setLocalState(() => category = v);
-                    }
-                  },
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: voucherCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Voucher No. (optional)',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: amountCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(labelText: 'Amount *'),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: regPageCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Reg. Page No. (optional)',
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: noteCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (optional)',
-                  ),
-                ),
-              ],
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final amount = double.tryParse(amountCtrl.text.trim());
-                if (amount == null || amount <= 0) return;
-                Navigator.pop(
-                  ctx,
-                  _MiscEntry(
-                    id:
-                        existing?.id ??
-                        DateTime.now().microsecondsSinceEpoch.toString(),
-                    category: category,
-                    entryDate: dateCtrl.text.trim().isEmpty
-                        ? _formatDate(selectedDate)
-                        : dateCtrl.text.trim(),
-                    voucherNo: voucherCtrl.text.trim().isEmpty
-                        ? null
-                        : voucherCtrl.text.trim(),
-                    amount: amount,
-                    regPageNo: regPageCtrl.text.trim().isEmpty
-                        ? null
-                        : regPageCtrl.text.trim(),
-                    notes: noteCtrl.text.trim().isEmpty
-                        ? null
-                        : noteCtrl.text.trim(),
-                  ),
-                );
-              },
-              child: Text(existing == null ? 'Add' : 'Save'),
-            ),
-          ],
-        ),
-      ),
     );
-
-    if (entry == null) return;
-    setState(() {
-      final idx = _record.entries.indexWhere((e) => e.id == entry.id);
-      final updatedEntries = List<_MiscEntry>.from(_record.entries);
-      if (idx == -1) {
-        updatedEntries.add(entry);
-      } else {
-        updatedEntries[idx] = entry;
-      }
-      _record = _record.copyWith(entries: updatedEntries);
-    });
   }
+}
 
-  void _deleteEntry(String entryId) {
-    setState(() {
-      _record = _record.copyWith(
-        entries: _record.entries.where((e) => e.id != entryId).toList(),
-      );
-    });
-  }
+// ─── Category Card ───────────────────────────────────────────────────
 
-  void _saveAndClose() {
-    Navigator.pop(context, _record);
-  }
+class _CategoryCard extends StatelessWidget {
+  final Map<String, dynamic> category;
+  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  Future<void> _showExportOptions() async {
-    final result = await showModalBottomSheet<String>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.picture_as_pdf),
-              title: const Text('Export as PDF'),
-              subtitle: const Text('Professional A4 report for this record'),
-              onTap: () => Navigator.pop(ctx, 'pdf'),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.table_chart_outlined),
-              title: const Text('Export as Excel'),
-              subtitle: const Text('Spreadsheet format for data entry'),
-              onTap: () => Navigator.pop(ctx, 'excel'),
-            ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.code),
-              title: const Text('Export as CSV'),
-              subtitle: const Text('Plain text comma-separated values'),
-              onTap: () => Navigator.pop(ctx, 'csv'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (result == null || !mounted) return;
-
-    try {
-      if (result == 'pdf') {
-        final savedHeader = await ExportService.loadHeaderText();
-        final headerText = await ExportService.showHeaderEditDialog(
-          context,
-          currentHeader: savedHeader,
-        );
-        if (!mounted) return;
-        final effectiveHeader = (headerText != null && headerText.isNotEmpty)
-            ? headerText
-            : savedHeader;
-
-        final bytes = await ExportService().exportMiscellaneousToPdf(
-          recordId: _record.id,
-        );
-        if (!mounted) return;
-
-        if (headerText != null && headerText.isNotEmpty) {
-          await ExportService.saveHeaderText(headerText);
-        }
-
-        final baseName = '${_record.title}_Report'.replaceAll(
-          RegExp(r'[^\w\s]'),
-          '_',
-        );
-        final pdfName = '$baseName.pdf';
-
-        if (Platform.isAndroid || Platform.isIOS) {
-          await Printing.sharePdf(bytes: bytes, filename: pdfName);
-        } else {
-          await Printing.layoutPdf(onLayout: (_) async => bytes, name: pdfName);
-        }
-      } else if (result == 'excel') {
-        final filePath = await ExportService().exportMiscellaneousToExcel(
-          recordId: _record.id,
-        );
-        if (!mounted) return;
-
-        final file = File(filePath);
-        if (Platform.isAndroid || Platform.isIOS) {
-          await Printing.sharePdf(
-            bytes: await file.readAsBytes(),
-            filename: filePath.split(Platform.pathSeparator).last,
-          );
-        } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Excel saved to: $filePath')));
-        }
-      } else if (result == 'csv') {
-        final filePath = await ExportService().exportMiscellaneousToCsv(
-          recordId: _record.id,
-        );
-        if (!mounted) return;
-
-        final file = File(filePath);
-        if (Platform.isAndroid || Platform.isIOS) {
-          await Printing.sharePdf(
-            bytes: await file.readAsBytes(),
-            filename: filePath.split(Platform.pathSeparator).last,
-          );
-        } else {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('CSV saved to: $filePath')));
-        }
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error exporting: $e')));
-    }
-  }
-
-  Future<bool> _onWillPop() async {
-    _saveAndClose();
-    return false;
-  }
+  const _CategoryCard({
+    required this.category,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
-      child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _saveAndClose,
+    final name = (category['name'] ?? '').toString();
+    final iconName = (category['icon_name'] ?? 'category_outlined').toString();
+    final colorVal = category['color_value'] as int? ?? AppColors.primary.toARGB32();
+    final color = Color(colorVal);
+    final count = category['record_count'] as int? ?? 0;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                color.withValues(alpha: 0.12),
+                color.withValues(alpha: 0.04),
+              ],
+            ),
           ),
-          title: Text(_record.title),
-          actions: [
-            IconButton(
-              onPressed: _showExportOptions,
-              icon: const Icon(Icons.print_outlined),
-              tooltip: 'Print / Export',
-            ),
-            IconButton(
-              onPressed: _saveAndClose,
-              icon: const Icon(Icons.check),
-              tooltip: 'Save',
-            ),
-          ],
-        ),
-        body: ListView(
           padding: const EdgeInsets.all(16),
-          children: [
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.category_outlined,
-                          size: 18,
-                          color: Colors.blueGrey,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _record.category,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.account_tree_outlined,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Scheme',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: AppColors.textSecondary),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _record.schemeName ?? 'Unassigned Scheme',
-                                style: Theme.of(context).textTheme.bodyLarge
-                                    ?.copyWith(fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.inventory_2_outlined,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Set',
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(color: AppColors.textSecondary),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _record.setLabel ?? 'Unassigned Set',
-                                style: Theme.of(context).textTheme.bodyLarge
-                                    ?.copyWith(fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.receipt_long_outlined,
-                          size: 16,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Expenditures: ${_record.entries.length}',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                        const Spacer(),
-                        Text(
-                          'Total: Rs. ${_record.totalAmount.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            if (_record.entries.isEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 18),
-                child: Center(
-                  child: Text('No expenditures yet. Tap + to add.'),
-                ),
-              )
-            else
-              Card(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(
-                        label: Expanded(child: Center(child: Text('Sr.No'))),
-                      ),
-                      DataColumn(
-                        label: Expanded(child: Center(child: Text('Date'))),
-                      ),
-                      DataColumn(
-                        label: Expanded(
-                          child: Center(child: Text('Voucher No.')),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Expanded(
-                          child: Center(child: Text('Amount (PKR)')),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Expanded(
-                          child: Center(child: Text('Reg. Page No.')),
-                        ),
-                      ),
-                      DataColumn(
-                        label: Expanded(child: Center(child: Text('Actions'))),
-                      ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Row(
+                children: [
+                  const Spacer(),
+                  PopupMenuButton<String>(
+                    padding: EdgeInsets.zero,
+                    iconSize: 20,
+                    icon: Icon(Icons.more_vert, size: 20, color: AppColors.textSecondary),
+                    onSelected: (v) {
+                      if (v == 'edit') onEdit();
+                      if (v == 'delete') onDelete();
+                    },
+                    itemBuilder: (ctx) => [
+                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      const PopupMenuItem(value: 'delete', child: Text('Delete')),
                     ],
-                    rows: _record.entries.asMap().entries.map((entry) {
-                      final idx = entry.key;
-                      final row = entry.value;
-                      return DataRow(
-                        cells: [
-                          DataCell(Center(child: Text('${idx + 1}'))),
-                          DataCell(Center(child: Text(row.entryDate))),
-                          DataCell(Center(child: Text(row.voucherNo ?? '-'))),
-                          DataCell(
-                            Center(
-                              child: Text(
-                                'PKR ${row.amount.toStringAsFixed(0)}',
-                              ),
-                            ),
-                          ),
-                          DataCell(Center(child: Text(row.regPageNo ?? '-'))),
-                          DataCell(
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 18),
-                                  onPressed: () =>
-                                      _showEntryDialog(existing: row),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.delete_outline,
-                                    size: 18,
-                                  ),
-                                  onPressed: () => _deleteEntry(row.id),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
                   ),
-                ),
+                ],
               ),
-            const SizedBox(height: 14),
-            Align(
-              alignment: Alignment.center,
-              child: OutlinedButton.icon(
-                onPressed: () => _showEntryDialog(),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Entry'),
+              Icon(_iconFromName(iconName), size: 36, color: color),
+              const SizedBox(height: 10),
+              Text(
+                name,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+              const SizedBox(height: 6),
+              Text(
+                '$count record${count == 1 ? '' : 's'}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _MiscRecord {
-  final String id;
-  final String title;
-  final String category;
-  final int? schemeId;
-  final String? schemeName;
-  final int? setId;
-  final String? setLabel;
-  final List<_MiscEntry> entries;
+// ─── Add Category Card ──────────────────────────────────────────────
 
-  _MiscRecord({
-    required this.id,
-    required this.title,
-    required this.category,
-    required this.schemeId,
-    this.schemeName,
-    required this.setId,
-    this.setLabel,
-    required this.entries,
-  });
+class _AddCategoryCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AddCategoryCard({required this.onTap});
 
-  double get totalAmount => entries.fold<double>(0, (sum, e) => sum + e.amount);
-
-  _MiscRecord copyWith({
-    String? id,
-    String? title,
-    String? category,
-    int? schemeId,
-    String? schemeName,
-    int? setId,
-    String? setLabel,
-    List<_MiscEntry>? entries,
-  }) {
-    return _MiscRecord(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      category: category ?? this.category,
-      schemeId: schemeId ?? this.schemeId,
-      schemeName: schemeName ?? this.schemeName,
-      setId: setId ?? this.setId,
-      setLabel: setLabel ?? this.setLabel,
-      entries: entries ?? this.entries,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'category': category,
-    'schemeId': schemeId,
-    'schemeName': schemeName,
-    'setId': setId,
-    'setLabel': setLabel,
-    'entries': entries.map((e) => e.toJson()).toList(),
-  };
-
-  factory _MiscRecord.fromJson(Map<String, dynamic> json) {
-    return _MiscRecord(
-      id: (json['id'] ?? '').toString(),
-      title: (json['title'] ?? '').toString(),
-      category: (json['category'] ?? 'Miscellaneous').toString(),
-      schemeId: json['schemeId'] as int?,
-      schemeName: json['schemeName']?.toString(),
-      setId: json['setId'] as int?,
-      setLabel: json['setLabel']?.toString(),
-      entries: (json['entries'] is List)
-          ? (json['entries'] as List)
-                .whereType<Map>()
-                .map((e) => _MiscEntry.fromJson(Map<String, dynamic>.from(e)))
-                .toList()
-          : <_MiscEntry>[],
-    );
-  }
-}
-
-class _MiscEntry {
-  final String id;
-  final String category;
-  final String entryDate;
-  final String? voucherNo;
-  final double amount;
-  final String? regPageNo;
-  final String? notes;
-
-  _MiscEntry({
-    required this.id,
-    required this.category,
-    required this.entryDate,
-    this.voucherNo,
-    required this.amount,
-    this.regPageNo,
-    this.notes,
-  });
-
-  _MiscEntry copyWith({
-    String? id,
-    String? category,
-    String? entryDate,
-    String? voucherNo,
-    double? amount,
-    String? regPageNo,
-    String? notes,
-  }) {
-    return _MiscEntry(
-      id: id ?? this.id,
-      category: category ?? this.category,
-      entryDate: entryDate ?? this.entryDate,
-      voucherNo: voucherNo ?? this.voucherNo,
-      amount: amount ?? this.amount,
-      regPageNo: regPageNo ?? this.regPageNo,
-      notes: notes ?? this.notes,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'category': category,
-    'entryDate': entryDate,
-    'voucherNo': voucherNo,
-    'amount': amount,
-    'regPageNo': regPageNo,
-    'notes': notes,
-  };
-
-  factory _MiscEntry.fromJson(Map<String, dynamic> json) {
-    return _MiscEntry(
-      id: (json['id'] ?? '').toString(),
-      category: (json['category'] ?? 'Miscellaneous').toString(),
-      entryDate: (json['entryDate'] ?? '').toString(),
-      voucherNo: json['voucherNo']?.toString(),
-      amount: double.tryParse((json['amount'] ?? 0).toString()) ?? 0,
-      regPageNo: json['regPageNo']?.toString(),
-      notes: json['notes']?.toString(),
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: AppColors.border, width: 1.5),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.add_circle_outline, size: 36, color: AppColors.primary),
+              const SizedBox(height: 10),
+              Text(
+                'Add New\nCategory',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

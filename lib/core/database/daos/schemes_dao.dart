@@ -35,7 +35,7 @@ class SchemesDao {
       WHERE LOWER(s.category) = LOWER(?)
         ${parentSchemeId == null ? '' : 'AND s.parent_scheme_id = ?'}
         ${parentSetId == null ? '' : 'AND s.parent_set_id = ?'}
-      ORDER BY s.scheme_name ASC
+      ORDER BY s.sort_order ASC, s.scheme_name ASC
     ''',
       [
         category,
@@ -90,12 +90,21 @@ class SchemesDao {
   Future<int> insertScheme(Scheme scheme) async {
     final db = await _db.database;
     final now = _now();
+    // Auto-assign sort_order to end of list if not specified
+    int order = scheme.sortOrder;
+    if (order == 0) {
+      final result = await db.rawQuery(
+        'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM schemes',
+      );
+      order = result.first['next_order'] as int;
+    }
     return await db.insert('schemes', {
       'scheme_name': scheme.schemeName,
       'category': scheme.category,
       'parent_scheme_id': scheme.parentSchemeId,
       'parent_set_id': scheme.parentSetId,
       'description': scheme.description,
+      'sort_order': order,
       'created_at': now,
       'updated_at': now,
     });
@@ -111,6 +120,7 @@ class SchemesDao {
         'parent_scheme_id': scheme.parentSchemeId,
         'parent_set_id': scheme.parentSetId,
         'description': scheme.description,
+        'sort_order': scheme.sortOrder,
         'updated_at': _now(),
       },
       where: 'scheme_id = ?',
@@ -146,5 +156,20 @@ class SchemesDao {
       [category],
     );
     return result.first['cnt'] as int;
+  }
+
+  /// Bulk-update sort_order for a list of scheme IDs in the given order.
+  Future<void> reorderSchemes(List<int> schemeIds) async {
+    final db = await _db.database;
+    await db.transaction((txn) async {
+      for (int i = 0; i < schemeIds.length; i++) {
+        await txn.update(
+          'schemes',
+          {'sort_order': i, 'updated_at': _now()},
+          where: 'scheme_id = ?',
+          whereArgs: [schemeIds[i]],
+        );
+      }
+    });
   }
 }

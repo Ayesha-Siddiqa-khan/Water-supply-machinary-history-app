@@ -259,9 +259,9 @@ class _ImportPreviewScreenState extends State<ImportPreviewScreen> {
                                     .map((e) => DataRow(cells: [
                                           DataCell(Text('${e.serialNo}')),
                                           DataCell(Text(e.date)),
-                                          DataCell(Text(e.voucherNo?.toString() ?? '-')),
+                                          DataCell(Text(e.voucherNo?.toString() ?? '')),
                                           DataCell(Text(CurrencyUtils.formatAmount(e.amount))),
-                                          DataCell(Text(e.regPageNo ?? '-')),
+                                          DataCell(Text(e.regPageNo ?? '')),
                                         ]))
                                     .toList(),
                               ),
