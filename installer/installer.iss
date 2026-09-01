@@ -2,7 +2,7 @@
 ; Generated for professional Windows installation
 
 #define MyAppName "Water Supply Scheme History"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.1.0"
 #define MyAppPublisher "City Water Works"
 #define MyAppURL "https://github.com/Ayesha-Siddiqa-khan/Water-supply-machinary-history-app"
 #define MyAppExeName "city_water_works_app.exe"

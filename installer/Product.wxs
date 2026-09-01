@@ -3,7 +3,7 @@
   <Package
     Name="Water Supply Scheme History"
     Manufacturer="City Water Works"
-    Version="1.0.0"
+    Version="1.1.0"
     UpgradeCode="D2E5E26A-8C95-454B-B33D-1D051C634A54"
     Language="1033"
     InstallerVersion="500"
