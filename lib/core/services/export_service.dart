@@ -71,8 +71,17 @@ class ExportService {
   static const double _reportTableFontSize = 10;
   static const double _reportTableHeaderFontSize = 10;
   static const int _manualWritingRows = 6;
-  static const int _miscMinTableRows = 28;
+  static const int _miscMinTableRows = 16;
   static const int _miscRowsPerPage = 16;
+
+  static int _miscTableRowCount(int recordCount) {
+    final requiredRows = math.max(
+      recordCount + _manualWritingRows,
+      _miscMinTableRows,
+    );
+    return ((requiredRows + _miscRowsPerPage - 1) ~/ _miscRowsPerPage) *
+        _miscRowsPerPage;
+  }
 
   final SchemesDao _schemesDao = SchemesDao();
   final SetsDao _setsDao = SetsDao();
@@ -2086,10 +2095,7 @@ class ExportService {
     for (final category in miscCategories) {
       firstPageByMisc[category] = nextMiscPage;
       final recordCount = miscGrouped[category]!.length;
-      final totalRows = math.max(
-        recordCount + _manualWritingRows,
-        _miscMinTableRows,
-      );
+      final totalRows = _miscTableRowCount(recordCount);
       nextMiscPage += (totalRows / _miscRowsPerPage).ceil();
     }
 
@@ -2431,10 +2437,7 @@ class ExportService {
         );
       }
 
-      final totalRows = math.max(
-        catRecords.length + _manualWritingRows,
-        _miscMinTableRows,
-      );
+      final totalRows = _miscTableRowCount(catRecords.length);
       for (
         int pageStart = 0;
         pageStart < totalRows;
@@ -3449,10 +3452,7 @@ class ExportService {
         (sum, r) => sum + r.totalAmount,
       );
 
-      final totalRows = math.max(
-        catRecords.length + _manualWritingRows,
-        _miscMinTableRows,
-      );
+      final totalRows = _miscTableRowCount(catRecords.length);
       for (
         int pageStart = 0;
         pageStart < totalRows;
