@@ -2080,8 +2080,15 @@ class ExportService {
     // ── Load miscellaneous records grouped by category ──
     final miscRecords = await _loadMiscRecords();
     final miscGrouped = <String, List<_MiscRecordExport>>{};
+    // Canonical names: first-seen casing wins per lowercase key
+    final canonicalCategory = <String, String>{};
     for (final record in miscRecords) {
-      miscGrouped.putIfAbsent(record.category, () => []).add(record);
+      final key = record.category.toLowerCase();
+      final canonical = canonicalCategory.putIfAbsent(
+        key,
+        () => record.category,
+      );
+      miscGrouped.putIfAbsent(canonical, () => []).add(record);
     }
     // Sort each category's records by date ascending
     for (final entry in miscGrouped.entries) {
@@ -2411,22 +2418,30 @@ class ExportService {
       pw.Widget miscCell(
         String text, {
         bool bold = false,
-        double height = 27,
+        bool isHeader = false,
         pw.TextAlign align = pw.TextAlign.center,
       }) {
         final hasArabic = _containsArabic(text);
         final effectiveAlign = hasArabic ? pw.TextAlign.right : align;
+        final cellHeight = isHeader ? 32.0 : 27.0;
+        final fontSize = isHeader
+            ? _reportTableFontSize
+            : (text.length > 36
+                  ? _reportTableFontSize - 2
+                  : _reportTableFontSize - 1);
         return pw.Container(
-          height: height,
-          padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+          height: cellHeight,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2),
           child: pw.Text(
             text,
             textAlign: effectiveAlign,
             textDirection: hasArabic
                 ? pw.TextDirection.rtl
                 : pw.TextDirection.ltr,
+            maxLines: 2,
+            overflow: pw.TextOverflow.clip,
             style: pw.TextStyle(
-              fontSize: _reportTableFontSize,
+              fontSize: fontSize,
               font: hasArabic ? _arabicFont : (bold ? _boldFont : _baseFont),
               fontBold: _boldFont,
               fontFallback: _fontFallback ?? [],
@@ -2448,17 +2463,15 @@ class ExportService {
           pw.TableRow(
             decoration: const pw.BoxDecoration(color: PdfColors.grey300),
             children: [
-              miscCell('Sr.No', bold: true, height: 32),
-              miscCell('Date', bold: true, height: 32),
-              miscCell('Title', bold: true, height: 32),
-              miscCell('Description', bold: true, height: 32),
-              miscCell('Location', bold: true, height: 32),
-              miscCell('Scheme Ref', bold: true, height: 32),
-              miscCell('Amount (PKR)', bold: true, height: 32),
-              miscCell('Voucher No.', bold: true, height: 32),
-              miscCell('W.O. No.', bold: true, height: 32),
-              miscCell('Reg. Page', bold: true, height: 32),
-              miscCell('Notes', bold: true, height: 32),
+              miscCell('Sr.No', bold: true, isHeader: true),
+              miscCell('Date', bold: true, isHeader: true),
+              miscCell('Title', bold: true, isHeader: true),
+              miscCell('Location', bold: true, isHeader: true),
+              miscCell('Scheme Ref', bold: true, isHeader: true),
+              miscCell('Amount (PKR)', bold: true, isHeader: true),
+              miscCell('Voucher No.', bold: true, isHeader: true),
+              miscCell('W.O. No.', bold: true, isHeader: true),
+              miscCell('Reg. Page', bold: true, isHeader: true),
             ],
           ),
         ];
@@ -2466,7 +2479,7 @@ class ExportService {
         for (int rowIndex = pageStart; rowIndex < pageEnd; rowIndex++) {
           if (rowIndex >= catRecords.length) {
             tableRows.add(
-              pw.TableRow(children: List.generate(11, (_) => miscCell(''))),
+              pw.TableRow(children: List.generate(9, (_) => miscCell(''))),
             );
             continue;
           }
@@ -2478,14 +2491,12 @@ class ExportService {
                 miscCell('${rowIndex + 1}'),
                 miscCell(record.date),
                 miscCell(record.title, align: pw.TextAlign.left),
-                miscCell(record.description ?? '', align: pw.TextAlign.left),
                 miscCell(record.location, align: pw.TextAlign.left),
                 miscCell(record.schemeRef),
                 miscCell(_formatAmountPlain(record.totalAmount)),
                 miscCell(record.voucherNo ?? ''),
                 miscCell(record.workOrderNo ?? ''),
                 miscCell(record.regPageNo ?? ''),
-                miscCell(record.notes ?? '', align: pw.TextAlign.left),
               ],
             ),
           );
@@ -2529,17 +2540,15 @@ class ExportService {
                   pw.SizedBox(height: 4),
                   pw.Table(
                     columnWidths: {
-                      0: const pw.FixedColumnWidth(32),
+                      0: const pw.FixedColumnWidth(30),
                       1: const pw.FixedColumnWidth(56),
-                      2: const pw.FixedColumnWidth(92),
-                      3: const pw.FixedColumnWidth(80),
-                      4: const pw.FixedColumnWidth(80),
-                      5: const pw.FixedColumnWidth(72),
-                      6: const pw.FixedColumnWidth(60),
-                      7: const pw.FixedColumnWidth(60),
-                      8: const pw.FixedColumnWidth(60),
-                      9: const pw.FixedColumnWidth(52),
-                      10: const pw.FixedColumnWidth(102),
+                      2: const pw.FixedColumnWidth(156),
+                      3: const pw.FixedColumnWidth(130),
+                      4: const pw.FixedColumnWidth(100),
+                      5: const pw.FixedColumnWidth(70),
+                      6: const pw.FixedColumnWidth(70),
+                      7: const pw.FixedColumnWidth(70),
+                      8: const pw.FixedColumnWidth(56),
                     },
                     border: pw.TableBorder.all(
                       color: PdfColors.black,
@@ -3407,31 +3416,42 @@ class ExportService {
       throw Exception('No miscellaneous data found to export');
     }
 
-    // Group records by category
+    // Group records by category (case-insensitive)
     final grouped = <String, List<_MiscRecordExport>>{};
+    final canonicalCat = <String, String>{};
     for (final record in records) {
-      grouped.putIfAbsent(record.category, () => []).add(record);
+      final key = record.category.toLowerCase();
+      final canonical = canonicalCat.putIfAbsent(key, () => record.category);
+      grouped.putIfAbsent(canonical, () => []).add(record);
     }
 
     pw.Widget cell(
       String text, {
       bool bold = false,
-      double height = 27,
+      bool isHeader = false,
       pw.TextAlign align = pw.TextAlign.center,
     }) {
       final hasArabic = _containsArabic(text);
       final effectiveAlign = hasArabic ? pw.TextAlign.right : align;
+      final cellHeight = isHeader ? 32.0 : 27.0;
+      final fontSize = isHeader
+          ? _reportTableFontSize
+          : (text.length > 36
+                ? _reportTableFontSize - 2
+                : _reportTableFontSize - 1);
       return pw.Container(
-        height: height,
-        padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        height: cellHeight,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2),
         child: pw.Text(
           text,
           textAlign: effectiveAlign,
           textDirection: hasArabic
               ? pw.TextDirection.rtl
               : pw.TextDirection.ltr,
+          maxLines: 2,
+          overflow: pw.TextOverflow.clip,
           style: pw.TextStyle(
-            fontSize: _reportTableFontSize,
+            fontSize: fontSize,
             font: hasArabic ? _arabicFont : (bold ? _boldFont : _baseFont),
             fontBold: _boldFont,
             fontFallback: _fontFallback ?? [],
@@ -3463,17 +3483,15 @@ class ExportService {
           pw.TableRow(
             decoration: const pw.BoxDecoration(color: PdfColors.grey300),
             children: [
-              cell('Sr.No', bold: true, height: 32),
-              cell('Date', bold: true, height: 32),
-              cell('Title', bold: true, height: 32),
-              cell('Description', bold: true, height: 32),
-              cell('Location', bold: true, height: 32),
-              cell('Scheme Ref', bold: true, height: 32),
-              cell('Amount (PKR)', bold: true, height: 32),
-              cell('Voucher No.', bold: true, height: 32),
-              cell('W.O. No.', bold: true, height: 32),
-              cell('Reg. Page', bold: true, height: 32),
-              cell('Notes', bold: true, height: 32),
+              cell('Sr.No', bold: true, isHeader: true),
+              cell('Date', bold: true, isHeader: true),
+              cell('Title', bold: true, isHeader: true),
+              cell('Location', bold: true, isHeader: true),
+              cell('Scheme Ref', bold: true, isHeader: true),
+              cell('Amount (PKR)', bold: true, isHeader: true),
+              cell('Voucher No.', bold: true, isHeader: true),
+              cell('W.O. No.', bold: true, isHeader: true),
+              cell('Reg. Page', bold: true, isHeader: true),
             ],
           ),
         ];
@@ -3481,7 +3499,7 @@ class ExportService {
         for (int rowIndex = pageStart; rowIndex < pageEnd; rowIndex++) {
           if (rowIndex >= catRecords.length) {
             tableRows.add(
-              pw.TableRow(children: List.generate(11, (_) => cell(''))),
+              pw.TableRow(children: List.generate(9, (_) => cell(''))),
             );
             continue;
           }
@@ -3493,14 +3511,12 @@ class ExportService {
                 cell('${rowIndex + 1}'),
                 cell(record.date),
                 cell(record.title, align: pw.TextAlign.left),
-                cell(record.description ?? '', align: pw.TextAlign.left),
                 cell(record.location, align: pw.TextAlign.left),
                 cell(record.schemeRef),
                 cell(_formatAmountPlain(record.totalAmount)),
                 cell(record.voucherNo ?? ''),
                 cell(record.workOrderNo ?? ''),
                 cell(record.regPageNo ?? ''),
-                cell(record.notes ?? '', align: pw.TextAlign.left),
               ],
             ),
           );
@@ -3546,17 +3562,15 @@ class ExportService {
                       pw.SizedBox(height: 4),
                       pw.Table(
                         columnWidths: {
-                          0: const pw.FixedColumnWidth(32),
+                          0: const pw.FixedColumnWidth(30),
                           1: const pw.FixedColumnWidth(56),
-                          2: const pw.FixedColumnWidth(92),
-                          3: const pw.FixedColumnWidth(80),
-                          4: const pw.FixedColumnWidth(80),
-                          5: const pw.FixedColumnWidth(72),
-                          6: const pw.FixedColumnWidth(60),
-                          7: const pw.FixedColumnWidth(60),
-                          8: const pw.FixedColumnWidth(60),
-                          9: const pw.FixedColumnWidth(52),
-                          10: const pw.FixedColumnWidth(102),
+                          2: const pw.FixedColumnWidth(156),
+                          3: const pw.FixedColumnWidth(130),
+                          4: const pw.FixedColumnWidth(100),
+                          5: const pw.FixedColumnWidth(70),
+                          6: const pw.FixedColumnWidth(70),
+                          7: const pw.FixedColumnWidth(70),
+                          8: const pw.FixedColumnWidth(56),
                         },
                         border: pw.TableBorder.all(
                           color: PdfColors.black,
@@ -3911,7 +3925,16 @@ class _MiscRecordExport {
       amount > 0 ? amount : entries.fold<double>(0, (sum, e) => sum + e.amount);
 
   String get schemeRef {
-    if (locationType == 'scheme') {
+    final lt = (locationType ?? '').toLowerCase();
+    if (lt == 'scheme' || lt.isEmpty) {
+      final parts = [
+        schemeName,
+        setLabel,
+      ].where((e) => e != null && e.isNotEmpty).toList();
+      if (parts.isNotEmpty) return parts.join(' - ');
+    }
+    // Fallback: if locationType is missing/unknown but scheme data exists, show it
+    if (schemeName != null && schemeName!.isNotEmpty) {
       final parts = [
         schemeName,
         setLabel,
@@ -3922,7 +3945,15 @@ class _MiscRecordExport {
   }
 
   String get location {
-    if (locationType == 'external') {
+    final lt = (locationType ?? '').toLowerCase();
+    if (lt == 'external') {
+      return [
+        locationName,
+        locationAddress,
+      ].where((e) => e != null && e.isNotEmpty).join(', ');
+    }
+    // Fallback: if locationType is missing/unknown but location data exists, show it
+    if (locationName != null && locationName!.isNotEmpty) {
       return [
         locationName,
         locationAddress,

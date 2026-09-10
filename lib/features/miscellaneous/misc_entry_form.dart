@@ -22,19 +22,42 @@ class CategoryFieldDef {
 
 const Map<String, List<CategoryFieldDef>> categoryFields = {
   'Sluice Valves': [
-    CategoryFieldDef(key: 'valveSize', label: 'Valve Size', options: [
-      '2 Inch', '3 Inch', '4 Inch', '5 Inch', '6 Inch', '7 Inch', '8 Inch', 'Other',
-    ]),
+    CategoryFieldDef(
+      key: 'valveSize',
+      label: 'Valve Size',
+      options: [
+        '2 Inch',
+        '3 Inch',
+        '4 Inch',
+        '5 Inch',
+        '6 Inch',
+        '7 Inch',
+        '8 Inch',
+        '10 Inch',
+        '12 Inch',
+        '14 Inch',
+        '16 Inch',
+        '18 Inch',
+        '20 Inch',
+        '22 Inch',
+        '24 Inch',
+        'Other',
+      ],
+    ),
   ],
   'Electrical': [
-    CategoryFieldDef(key: 'equipmentType', label: 'Equipment Type', options: [
-      'Transformer', 'Motor', 'Cable', 'Panel', 'Other',
-    ]),
+    CategoryFieldDef(
+      key: 'equipmentType',
+      label: 'Equipment Type',
+      options: ['Transformer', 'Motor', 'Cable', 'Panel', 'Other'],
+    ),
   ],
   'Spare Motor': [
-    CategoryFieldDef(key: 'motorHp', label: 'Motor HP', options: [
-      '5 HP', '10 HP', '25 HP', '50 HP', 'Other',
-    ]),
+    CategoryFieldDef(
+      key: 'motorHp',
+      label: 'Motor HP',
+      options: ['5 HP', '10 HP', '25 HP', '50 HP', 'Other'],
+    ),
   ],
 };
 
@@ -174,9 +197,13 @@ class MiscRecord {
       title: (json['title'] ?? '').toString(),
       category: (json['category'] ?? 'Miscellaneous').toString(),
       description: json['description']?.toString(),
-      schemeId: json['schemeId'] is int ? json['schemeId'] as int : int.tryParse((json['schemeId'] ?? '').toString()),
+      schemeId: json['schemeId'] is int
+          ? json['schemeId'] as int
+          : int.tryParse((json['schemeId'] ?? '').toString()),
       schemeName: json['schemeName']?.toString(),
-      setId: json['setId'] is int ? json['setId'] as int : int.tryParse((json['setId'] ?? '').toString()),
+      setId: json['setId'] is int
+          ? json['setId'] as int
+          : int.tryParse((json['setId'] ?? '').toString()),
       setLabel: json['setLabel']?.toString(),
       locationType: (json['locationType'] ?? 'external').toString(),
       locationName: json['locationName']?.toString(),
@@ -190,7 +217,10 @@ class MiscRecord {
       notes: json['notes']?.toString(),
       categoryData: catData,
       entries: (json['entries'] is List)
-          ? (json['entries'] as List).whereType<Map>().map((e) => MiscEntry.fromJson(Map<String, dynamic>.from(e))).toList()
+          ? (json['entries'] as List)
+                .whereType<Map>()
+                .map((e) => MiscEntry.fromJson(Map<String, dynamic>.from(e)))
+                .toList()
           : <MiscEntry>[],
     );
   }
@@ -259,6 +289,8 @@ class MiscEntryForm extends StatefulWidget {
 }
 
 class _MiscEntryFormState extends State<MiscEntryForm> {
+  static const _manualOptionValue = '__manual_entry__';
+
   final _formKey = GlobalKey<FormState>();
   final _miscDao = MiscellaneousDao();
   final _titleCtrl = TextEditingController();
@@ -279,12 +311,33 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
   DateTime _selectedDate = DateTime.now();
   Map<String, dynamic> _categoryData = {};
   List<CategoryFieldDef> _dbFields = [];
+  List<Map<String, dynamic>> _valveItems = [];
+  final Set<String> _manualCategoryFields = {};
 
   bool get isEditing => widget.existing != null;
 
   List<CategoryFieldDef> get _fields => _dbFields.isNotEmpty
       ? _dbFields
       : (categoryFields[widget.category] ?? []);
+
+  static const _valveSizeOptions = [
+    '2 Inch',
+    '3 Inch',
+    '4 Inch',
+    '5 Inch',
+    '6 Inch',
+    '7 Inch',
+    '8 Inch',
+    '10 Inch',
+    '12 Inch',
+    '14 Inch',
+    '16 Inch',
+    '18 Inch',
+    '20 Inch',
+    '22 Inch',
+    '24 Inch',
+    'Other',
+  ];
 
   Future<void> _loadCategoryFields() async {
     final meta = await _miscDao.getCategoryMetaByName(widget.category);
@@ -293,12 +346,21 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
       final decoded = jsonDecode(meta['custom_fields'].toString());
       if (decoded is List) {
         setState(() {
-          _dbFields = decoded.whereType<Map>().map((m) => CategoryFieldDef(
-            key: (m['key'] ?? '').toString(),
-            label: (m['label'] ?? '').toString(),
-            type: (m['type'] ?? 'dropdown').toString(),
-            options: (m['options'] as List?)?.map((e) => e.toString()).toList() ?? [],
-          )).toList();
+          _dbFields = decoded
+              .whereType<Map>()
+              .map(
+                (m) => CategoryFieldDef(
+                  key: (m['key'] ?? '').toString(),
+                  label: (m['label'] ?? '').toString(),
+                  type: (m['type'] ?? 'dropdown').toString(),
+                  options:
+                      (m['options'] as List?)
+                          ?.map((e) => e.toString())
+                          .toList() ??
+                      [],
+                ),
+              )
+              .toList();
         });
       }
     } catch (_) {}
@@ -324,6 +386,13 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
       _selectedSchemeId = e.schemeId;
       _selectedSetId = e.setId;
       _categoryData = Map<String, dynamic>.from(e.categoryData);
+      final rawValveItems = _categoryData['valveItems'];
+      if (rawValveItems is List) {
+        _valveItems = rawValveItems
+            .whereType<Map>()
+            .map((m) => Map<String, dynamic>.from(m))
+            .toList();
+      }
       if (e.date.isNotEmpty) {
         _selectedDate = _parseDate(e.date);
         _dateCtrl.text = e.date;
@@ -355,7 +424,9 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
         constraints: const BoxConstraints(maxWidth: 640),
         child: Padding(
           padding: EdgeInsets.only(
-            left: 16, right: 16, top: 16,
+            left: 16,
+            right: 16,
+            top: 16,
             bottom: MediaQuery.of(context).viewInsets.bottom + 16,
           ),
           child: Form(
@@ -367,7 +438,8 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
                 children: [
                   Center(
                     child: Container(
-                      width: 40, height: 4,
+                      width: 40,
+                      height: 4,
                       decoration: BoxDecoration(
                         color: AppColors.border,
                         borderRadius: BorderRadius.circular(2),
@@ -376,7 +448,9 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    isEditing ? 'Edit ${widget.category} Entry' : 'Add ${widget.category} Entry',
+                    isEditing
+                        ? 'Edit ${widget.category} Entry'
+                        : 'Add ${widget.category} Entry',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 20),
@@ -408,7 +482,8 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
                         },
                       ),
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -419,7 +494,8 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
                       hintText: 'e.g., Main Leakage at Chak 3 FW',
                       prefixIcon: Icon(Icons.title),
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -437,14 +513,18 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _amountCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'Amount (PKR)',
                       prefixIcon: Icon(Icons.payments_outlined),
                     ),
                     validator: (v) {
                       if (v == null || v.trim().isEmpty) return null;
-                      if (double.tryParse(v.trim()) == null) return 'Invalid number';
+                      if (double.tryParse(v.trim()) == null) {
+                        return 'Invalid number';
+                      }
                       return null;
                     },
                   ),
@@ -504,11 +584,20 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
                   const SizedBox(height: 8),
                   SegmentedButton<String>(
                     segments: const [
-                      ButtonSegment(value: 'external', label: Text('Outside Scheme'), icon: Icon(Icons.location_on_outlined)),
-                      ButtonSegment(value: 'scheme', label: Text('Related to Scheme'), icon: Icon(Icons.account_tree_outlined)),
+                      ButtonSegment(
+                        value: 'external',
+                        label: Text('Outside Scheme'),
+                        icon: Icon(Icons.location_on_outlined),
+                      ),
+                      ButtonSegment(
+                        value: 'scheme',
+                        label: Text('Related to Scheme'),
+                        icon: Icon(Icons.account_tree_outlined),
+                      ),
                     ],
                     selected: {_locationType},
-                    onSelectionChanged: (v) => setState(() => _locationType = v.first),
+                    onSelectionChanged: (v) =>
+                        setState(() => _locationType = v.first),
                   ),
                   const SizedBox(height: 12),
                   if (_locationType == 'scheme') ...[
@@ -518,10 +607,14 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
                         labelText: 'Select Scheme *',
                         prefixIcon: Icon(Icons.account_tree_outlined),
                       ),
-                      items: widget.schemes.map((s) => DropdownMenuItem(
-                        value: s.schemeId,
-                        child: Text(s.schemeName),
-                      )).toList(),
+                      items: widget.schemes
+                          .map(
+                            (s) => DropdownMenuItem(
+                              value: s.schemeId,
+                              child: Text(s.schemeName),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (v) => setState(() {
                         _selectedSchemeId = v;
                         _selectedSetId = null;
@@ -533,15 +626,20 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
                       key: ValueKey(_selectedSchemeId),
                       initialValue: _selectedSetId,
                       decoration: const InputDecoration(
-                        labelText: 'Select Set *',
+                        labelText: 'Select Set',
                         prefixIcon: Icon(Icons.folder_outlined),
                       ),
-                      items: (widget.setsBySchemeId[_selectedSchemeId] ?? const <SetModel>[]).map((s) => DropdownMenuItem(
-                        value: s.setId,
-                        child: Text(s.setLabel),
-                      )).toList(),
+                      items:
+                          (widget.setsBySchemeId[_selectedSchemeId] ??
+                                  const <SetModel>[])
+                              .map(
+                                (s) => DropdownMenuItem(
+                                  value: s.setId,
+                                  child: Text(s.setLabel),
+                                ),
+                              )
+                              .toList(),
                       onChanged: (v) => setState(() => _selectedSetId = v),
-                      validator: (v) => v == null ? 'Required' : null,
                     ),
                   ] else ...[
                     TextFormField(
@@ -574,13 +672,124 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
                   const SizedBox(height: 20),
 
                   // ── Section 4: Category-Specific Fields ──
-                  if (_fields.isNotEmpty) ...[
-                    _sectionHeader('Category-Specific Information'),
+                  if (widget.category == 'Sluice Valves') ...[
+                    _sectionHeader('Valve Details (Optional)'),
                     const SizedBox(height: 8),
-                    ..._fields.map((field) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildCategoryField(field),
-                    )),
+                    ..._valveItems.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final item = entry.value;
+                      final size = item['size']?.toString() ?? '';
+                      final usesManualSize =
+                          item['manualSize'] == true ||
+                          (size.isNotEmpty &&
+                              !_valveSizeOptions.contains(size));
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: DropdownButtonFormField<String>(
+                                    initialValue: usesManualSize
+                                        ? _manualOptionValue
+                                        : (_valveSizeOptions.contains(size)
+                                              ? size
+                                              : null),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Valve Size (Optional)',
+                                      prefixIcon: Icon(Icons.tune),
+                                    ),
+                                    items: [
+                                      ..._valveSizeOptions.map(
+                                        (option) => DropdownMenuItem(
+                                          value: option,
+                                          child: Text(option),
+                                        ),
+                                      ),
+                                      const DropdownMenuItem(
+                                        value: _manualOptionValue,
+                                        child: Text('Enter manually...'),
+                                      ),
+                                    ],
+                                    onChanged: (value) {
+                                      setState(() {
+                                        if (value == _manualOptionValue) {
+                                          _valveItems[idx]['manualSize'] = true;
+                                          _valveItems[idx]['size'] = '';
+                                        } else {
+                                          _valveItems[idx]['manualSize'] =
+                                              false;
+                                          _valveItems[idx]['size'] = value;
+                                        }
+                                      });
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  flex: 2,
+                                  child: TextFormField(
+                                    initialValue:
+                                        item['quantity']?.toString() ?? '',
+                                    keyboardType: TextInputType.number,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Qty (Optional)',
+                                      prefixIcon: Icon(Icons.numbers),
+                                    ),
+                                    onChanged: (value) => setState(
+                                      () => _valveItems[idx]['quantity'] =
+                                          int.tryParse(value) ?? 0,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () =>
+                                      setState(() => _valveItems.removeAt(idx)),
+                                ),
+                              ],
+                            ),
+                            if (usesManualSize) ...[
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                key: ValueKey('manual_valve_${idx}_$size'),
+                                initialValue: size,
+                                decoration: const InputDecoration(
+                                  labelText: 'Custom Valve Size (Optional)',
+                                  prefixIcon: Icon(Icons.edit_outlined),
+                                ),
+                                onChanged: (value) =>
+                                    _valveItems[idx]['size'] = value.trim(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    }),
+                    TextButton.icon(
+                      onPressed: () => setState(
+                        () => _valveItems.add({'size': null, 'quantity': 1}),
+                      ),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Another Valve'),
+                    ),
+                  ] else if (_fields.isNotEmpty) ...[
+                    _sectionHeader('Category-Specific Information (Optional)'),
+                    const SizedBox(height: 8),
+                    ..._fields.map(
+                      (field) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildCategoryField(field),
+                      ),
+                    ),
                   ],
 
                   // ── Buttons ──
@@ -597,7 +806,9 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: _save,
-                          child: Text(isEditing ? 'Save Changes' : 'Save Entry'),
+                          child: Text(
+                            isEditing ? 'Save Changes' : 'Save Entry',
+                          ),
                         ),
                       ),
                     ],
@@ -614,10 +825,13 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
   Widget _sectionHeader(String title) {
     return Row(
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: AppColors.primary,
-        )),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: AppColors.primary,
+          ),
+        ),
         const SizedBox(width: 8),
         const Expanded(child: Divider()),
       ],
@@ -626,25 +840,85 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
 
   Widget _buildCategoryField(CategoryFieldDef field) {
     if (field.type == 'dropdown') {
-      final currentVal = _categoryData[field.key]?.toString();
-      return DropdownButtonFormField<String>(
-        initialValue: currentVal,
-        decoration: InputDecoration(
-          labelText: '${field.label} *',
-          prefixIcon: const Icon(Icons.tune),
-        ),
-        items: field.options.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
-        onChanged: (v) => setState(() => _categoryData[field.key] = v),
-        validator: (v) => v == null ? 'Required' : null,
+      final currentValue = _categoryData[field.key]?.toString() ?? '';
+      final usesManualValue =
+          _manualCategoryFields.contains(field.key) ||
+          (currentValue.isNotEmpty && !field.options.contains(currentValue));
+      final selectedValue = usesManualValue
+          ? _manualOptionValue
+          : (field.options.contains(currentValue) ? currentValue : null);
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DropdownButtonFormField<String>(
+            initialValue: selectedValue,
+            decoration: InputDecoration(
+              labelText: '${field.label} (Optional)',
+              prefixIcon: const Icon(Icons.tune),
+            ),
+            items: [
+              ...field.options.map(
+                (option) =>
+                    DropdownMenuItem(value: option, child: Text(option)),
+              ),
+              const DropdownMenuItem(
+                value: _manualOptionValue,
+                child: Text('Enter manually...'),
+              ),
+            ],
+            onChanged: (value) {
+              setState(() {
+                if (value == _manualOptionValue) {
+                  _manualCategoryFields.add(field.key);
+                  _categoryData.remove(field.key);
+                } else {
+                  _manualCategoryFields.remove(field.key);
+                  if (value == null || value.isEmpty) {
+                    _categoryData.remove(field.key);
+                  } else {
+                    _categoryData[field.key] = value;
+                  }
+                }
+              });
+            },
+          ),
+          if (usesManualValue) ...[
+            const SizedBox(height: 8),
+            TextFormField(
+              key: ValueKey('manual_${field.key}_$currentValue'),
+              initialValue: currentValue,
+              decoration: InputDecoration(
+                labelText: 'Custom ${field.label} (Optional)',
+                prefixIcon: const Icon(Icons.edit_outlined),
+              ),
+              onChanged: (value) {
+                final trimmed = value.trim();
+                if (trimmed.isEmpty) {
+                  _categoryData.remove(field.key);
+                } else {
+                  _categoryData[field.key] = trimmed;
+                }
+              },
+            ),
+          ],
+        ],
       );
     }
     return TextFormField(
       initialValue: _categoryData[field.key]?.toString(),
       decoration: InputDecoration(
-        labelText: '${field.label} *',
+        labelText: '${field.label} (Optional)',
         prefixIcon: const Icon(Icons.tune),
       ),
-      onChanged: (v) => _categoryData[field.key] = v,
+      onChanged: (value) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty) {
+          _categoryData.remove(field.key);
+        } else {
+          _categoryData[field.key] = trimmed;
+        }
+      },
     );
   }
 
@@ -657,39 +931,70 @@ class _MiscEntryFormState extends State<MiscEntryForm> {
     String? setLabel;
 
     if (_locationType == 'scheme') {
-      final scheme = widget.schemes.firstWhere((s) => s.schemeId == _selectedSchemeId);
+      final scheme = widget.schemes.firstWhere(
+        (s) => s.schemeId == _selectedSchemeId,
+      );
       schemeId = scheme.schemeId;
       schemeName = scheme.schemeName;
-      final sets = widget.setsBySchemeId[_selectedSchemeId] ?? [];
-      final set = sets.firstWhere((s) => s.setId == _selectedSetId);
-      setId = set.setId;
-      setLabel = set.setLabel;
+      if (_selectedSetId != null) {
+        final sets = widget.setsBySchemeId[_selectedSchemeId] ?? [];
+        final match = sets.where((s) => s.setId == _selectedSetId);
+        if (match.isNotEmpty) {
+          setId = match.first.setId;
+          setLabel = match.first.setLabel;
+        }
+      }
     }
 
     final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
 
+    final catData = Map<String, dynamic>.from(_categoryData);
+    if (widget.category == 'Sluice Valves' && _valveItems.isNotEmpty) {
+      catData['valveItems'] = _valveItems.map((item) {
+        final savedItem = Map<String, dynamic>.from(item);
+        savedItem.remove('manualSize');
+        return savedItem;
+      }).toList();
+    }
+
     Navigator.pop(
       context,
       MiscRecord(
-        id: isEditing ? widget.existing!.id : DateTime.now().microsecondsSinceEpoch.toString(),
+        id: isEditing
+            ? widget.existing!.id
+            : DateTime.now().microsecondsSinceEpoch.toString(),
         title: _titleCtrl.text.trim(),
         category: widget.category,
-        description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+        description: _descCtrl.text.trim().isEmpty
+            ? null
+            : _descCtrl.text.trim(),
         schemeId: schemeId,
         schemeName: schemeName,
         setId: setId,
         setLabel: setLabel,
         locationType: _locationType,
-        locationName: _locationType == 'external' ? _locationNameCtrl.text.trim() : null,
-        locationAddress: _locationType == 'external' ? _locationAddressCtrl.text.trim() : null,
-        locationDescription: _locationType == 'external' ? _locationDescCtrl.text.trim() : null,
+        locationName: _locationType == 'external'
+            ? _locationNameCtrl.text.trim()
+            : null,
+        locationAddress: _locationType == 'external'
+            ? _locationAddressCtrl.text.trim()
+            : null,
+        locationDescription: _locationType == 'external'
+            ? _locationDescCtrl.text.trim()
+            : null,
         date: _dateCtrl.text.trim(),
         amount: amount,
-        workOrderNo: _workOrderCtrl.text.trim().isEmpty ? null : _workOrderCtrl.text.trim(),
-        voucherNo: _voucherCtrl.text.trim().isEmpty ? null : _voucherCtrl.text.trim(),
-        regPageNo: _regPageCtrl.text.trim().isEmpty ? null : _regPageCtrl.text.trim(),
+        workOrderNo: _workOrderCtrl.text.trim().isEmpty
+            ? null
+            : _workOrderCtrl.text.trim(),
+        voucherNo: _voucherCtrl.text.trim().isEmpty
+            ? null
+            : _voucherCtrl.text.trim(),
+        regPageNo: _regPageCtrl.text.trim().isEmpty
+            ? null
+            : _regPageCtrl.text.trim(),
         notes: _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-        categoryData: _categoryData,
+        categoryData: catData,
       ),
     );
   }
